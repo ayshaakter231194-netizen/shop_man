@@ -1,0 +1,396 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    Delete Product - Shop Management
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">
+            <i class="fas fa-trash-alt text-danger"></i>
+            Delete Product
+        </h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="{% url 'product_list' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Products
+            </a>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Confirm Product Deletion
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-exclamation-circle"></i>
+                            Warning: This action cannot be undone!
+                        </h6>
+                        <p class="mb-0">
+                            You are about to permanently delete this product and all associated data.
+                            This action will affect:
+                        </p>
+                    </div>
+
+                    <!-- Product Information -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-info-circle"></i>
+                                Product Details
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <th width="40%">Product Name:</th>
+                                            <td>{{ product.name }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>SKU:</th>
+                                            <td>{{ product.sku }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Barcode:</th>
+                                            <td>
+                                                {% if product.barcode %}
+                                                    <span class="badge bg-info">{{ product.barcode }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">Not set</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>Category:</th>
+                                            <td>{{ product.category.name }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <th width="40%">Supplier:</th>
+                                            <td>
+                                                {% if product.supplier %}
+                                                    {{ product.supplier.name }}
+                                                {% else %}
+                                                    <span class="text-muted">Not assigned</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>Current Stock:</th>
+                                            <td>
+                                                <span class="badge 
+                                                    {% if product.current_stock == 0 %}bg-danger
+                                                    {% elif product.current_stock <= product.min_stock_level %}bg-warning
+                                                    {% else %}bg-success{% endif %}">
+                                                    {{ product.current_stock }} units
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>Selling Price:</th>
+                                            <td>৳{{ product.selling_price }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Created:</th>
+                                            <td>{{ product.created_at|date:"M d, Y" }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Impact Analysis -->
+                    <div class="card border-warning mb-4">
+                        <div class="card-header bg-warning">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-chart-line"></i>
+                                Impact Analysis
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-3 mb-3">
+                                    <div class="border rounded p-3">
+                                        <div class="text-warning mb-2">
+                                            <i class="fas fa-boxes fa-2x"></i>
+                                        </div>
+                                        <h5>{{ product.current_stock }}</h5>
+                                        <small class="text-muted">Units in Stock</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="border rounded p-3">
+                                        <div class="text-info mb-2">
+                                            <i class="fas fa-shopping-cart fa-2x"></i>
+                                        </div>
+                                        <h5>{{ product.saleitem_set.count }}</h5>
+                                        <small class="text-muted">Sales Records</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="border rounded p-3">
+                                        <div class="text-primary mb-2">
+                                            <i class="fas fa-truck-loading fa-2x"></i>
+                                        </div>
+                                        <h5>{{ product.purchaseorderitem_set.count }}</h5>
+                                        <small class="text-muted">Purchase Records</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="border rounded p-3">
+                                        <div class="text-success mb-2">
+                                            <i class="fas fa-layer-group fa-2x"></i>
+                                        </div>
+                                        <h5>{{ product.batches.count }}</h5>
+                                        <small class="text-muted">Product Batches</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {% if product.saleitem_set.exists or product.purchaseorderitem_set.exists %}
+                            <div class="alert alert-warning mt-3">
+                                <h6 class="alert-heading">
+                                    <i class="fas fa-database"></i>
+                                    Data Retention Warning
+                                </h6>
+                                <p class="mb-0">
+                                    This product has historical sales and purchase data. Deleting it will:
+                                    <ul class="mb-0">
+                                        <li>Remove product from future operations</li>
+                                        <li>Break links in historical records</li>
+                                        <li>Affect sales and purchase reports</li>
+                                    </ul>
+                                </p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Alternative Options -->
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-lightbulb"></i>
+                                Consider Alternatives
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="d-grid gap-2">
+                                        <a href="{% url 'product_edit' product.pk %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-edit"></i> Edit Product Instead
+                                        </a>
+                                        <small class="text-muted text-center">
+                                            Update product details without losing data
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-grid gap-2">
+                                        <a href="{% url 'stock_adjustment' %}" class="btn btn-outline-warning">
+                                            <i class="fas fa-adjust"></i> Adjust Stock to Zero
+                                        </a>
+                                        <small class="text-muted text-center">
+                                            Set stock to zero instead of deleting
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Final Confirmation -->
+                    <div class="mt-4 p-4 border rounded bg-light">
+                        <form method="post" id="deleteForm">
+                            {% csrf_token %}
+                            
+                            <div class="mb-3">
+                                <label for="confirmationText" class="form-label fw-bold">
+                                    Type "DELETE" to confirm:
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="confirmationText" 
+                                       placeholder="Type DELETE here"
+                                       required
+                                       pattern="DELETE">
+                                <div class="form-text text-danger">
+                                    This action is permanent and cannot be recovered.
+                                </div>
+                            </div>
+
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <a href="{% url 'product_list' %}" class="btn btn-secondary me-md-2">
+                                    <i class="fas fa-times"></i> Cancel
+                                </a>
+                                <button type="submit" class="btn btn-danger" id="deleteButton" disabled>
+                                    <i class="fas fa-trash-alt"></i> Delete Product Permanently
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmationInput = document.getElementById('confirmationText');
+    const deleteButton = document.getElementById('deleteButton');
+    const deleteForm = document.getElementById('deleteForm');
+
+    // Enable/disable delete button based on input
+    confirmationInput.addEventListener('input', function() {
+        deleteButton.disabled = this.value !== 'DELETE';
+    });
+
+    // Confirm deletion
+    deleteForm.addEventListener('submit', function(e) {
+        if (confirmationInput.value !== 'DELETE') {
+            e.preventDefault();
+            showToast('Please type "DELETE" to confirm deletion.', 'error');
+            return;
+        }
+
+        const confirmed = confirm('FINAL WARNING: This will permanently delete the product and cannot be undone. Are you absolutely sure?');
+        if (!confirmed) {
+            e.preventDefault();
+            showToast('Deletion cancelled.', 'info');
+        }
+    });
+
+    // Toast notification function
+    function showToast(message, type = 'info') {
+        // Check if Bootstrap toast is available
+        if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+            // Create toast container if it doesn't exist
+            let toastContainer = document.getElementById('toastContainer');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toastContainer';
+                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                toastContainer.style.zIndex = '1055';
+                document.body.appendChild(toastContainer);
+            }
+
+            // Create toast element
+            const toastEl = document.createElement('div');
+            toastEl.className = `toast align-items-center text-bg-${type} border-0`;
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            
+            toastEl.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+
+            toastContainer.appendChild(toastEl);
+            const toast = new bootstrap.Toast(toastEl);
+            toast.show();
+
+            // Remove toast from DOM after it's hidden
+            toastEl.addEventListener('hidden.bs.toast', () => {
+                toastEl.remove();
+            });
+        } else {
+            // Fallback to simple alert
+            alert(message);
+        }
+    }
+});
+</script>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    font-weight: 600;
+}
+
+.table th {
+    font-weight: 600;
+    color: #495057;
+}
+
+.btn {
+    border-radius: 0.375rem;
+    font-weight: 500;
+}
+
+.alert {
+    border: none;
+    border-radius: 0.375rem;
+}
+
+.border-danger {
+    border-color: #dc3545 !important;
+}
+
+.bg-danger {
+    background-color: #dc3545 !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 0 15px;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .d-md-flex {
+        flex-direction: column;
+    }
+    
+    .me-md-2 {
+        margin-right: 0 !important;
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Custom badge styles */
+.badge {
+    font-size: 0.75em;
+    font-weight: 500;
+}
+
+/* Impact analysis cards */
+.border.rounded.p-3 {
+    transition: all 0.3s ease;
+}
+
+.border.rounded.p-3:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+</style>
+{% endblock %}

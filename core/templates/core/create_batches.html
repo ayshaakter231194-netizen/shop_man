@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Batches - {{ purchase_order }}{% endblock %}
+
+{% block inner_content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-boxes mr-2"></i>
+                        Create Batches for Purchase Order #{{ purchase_order.po_number }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Please review and configure batch information before completing this purchase order.
+                    </div>
+
+                    <form method="post" action="{% url 'process_batch_creation' purchase_order.id %}" id="batchForm">
+                        {% csrf_token %}
+                        
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h4 class="card-title">Order Information</h4>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <strong>Supplier:</strong> {{ purchase_order.supplier.name }}<br>
+                                                <strong>Order Date:</strong> {{ purchase_order.order_date|date:"M d, Y" }}
+                                            </div>
+                                            <div class="col-md-6">
+                                                <strong>Expected Date:</strong> {{ purchase_order.expected_date|date:"M d, Y" }}<br>
+                                                <strong>Total Amount:</strong> ৳{{ purchase_order.total_amount|floatformat:2 }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h4 class="card-title">Batch Configuration</h4>
+                                    </div>
+                                    <div class="card-body">
+                                        {% for item in purchase_order.items.all %}
+                                        <div class="batch-item mb-4 p-3 border rounded">
+                                            <h5 class="mb-3">
+                                                {{ item.product.name }} 
+                                                <small class="text-muted">(Qty: {{ item.quantity }})</small>
+                                                {% if item.product.has_expiry %}
+                                                <span class="badge bg-info ml-2">Expiry Tracked</span>
+                                                {% endif %}
+                                            </h5>
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="form-group">
+                                                        <label for="id_batch_number_{{ item.id }}">
+                                                            Batch Number *
+                                                        </label>
+                                                        <input type="text" 
+                                                               name="batch_number_{{ item.id }}" 
+                                                               value="{% if item.batch_number %}{{ item.batch_number }}{% else %}BATCH-{{ item.id }}-{{ purchase_order.po_number }}{% endif %}"
+                                                               class="form-control" 
+                                                               required
+                                                               id="id_batch_number_{{ item.id }}">
+                                                        <small class="form-text text-muted">
+                                                            Unique identifier for this batch
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                                {% if item.product.has_expiry %}
+                                                <div class="col-md-6">
+                                                    <div class="form-group">
+                                                        <label for="id_expiry_date_{{ item.id }}">
+                                                            Expiry Date *
+                                                        </label>
+                                                        <input type="date" 
+                                                               name="expiry_date_{{ item.id }}" 
+                                                               value="{% if item.expiry_date %}{{ item.expiry_date|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}"
+                                                               class="form-control" 
+                                                               required
+                                                               id="id_expiry_date_{{ item.id }}">
+                                                        <small class="form-text text-muted">
+                                                            When this batch expires
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                                {% else %}
+                                                <div class="col-md-6">
+                                                    <div class="form-group">
+                                                        <label for="id_expiry_date_{{ item.id }}">
+                                                            Expiry Date
+                                                        </label>
+                                                        <input type="date" 
+                                                               name="expiry_date_{{ item.id }}" 
+                                                               class="form-control" 
+                                                               id="id_expiry_date_{{ item.id }}"
+                                                               disabled>
+                                                        <small class="form-text text-muted">
+                                                            This product doesn't track expiry
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'mark_purchase_order_completed' purchase_order.id %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left mr-2"></i>Back to Confirmation
+                                    </a>
+                                    <div>
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="fas fa-check mr-2"></i>Create Batches & Complete Order
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Auto-generate batch numbers if empty
+    $('input[name^="batch_number_"]').each(function() {
+        if (!$(this).val()) {
+            const timestamp = new Date().getTime();
+            const random = Math.floor(Math.random() * 1000);
+            $(this).val('BATCH-' + timestamp + '-' + random);
+        }
+    });
+
+    // Set default expiry date to 1 year from now if empty and required
+    $('input[name^="expiry_date_"]').each(function() {
+        if (!$(this).val() && $(this).prop('required')) {
+            const oneYearLater = new Date();
+            oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+            $(this).val(oneYearLater.toISOString().split('T')[0]);
+        }
+    });
+
+    // Form validation
+    $('#batchForm').on('submit', function(e) {
+        let valid = true;
+        
+        // Check required fields
+        $('input[required]').each(function() {
+            if (!$(this).val()) {
+                valid = false;
+                $(this).addClass('is-invalid');
+            } else {
+                $(this).removeClass('is-invalid');
+            }
+        });
+        
+        if (!valid) {
+            e.preventDefault();
+            alert('Please fill in all required fields.');
+        }
+    });
+});
+</script>
+{% endblock %}

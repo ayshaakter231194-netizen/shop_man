@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Complete Purchase Order - Shop Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-check-circle"></i> Complete Purchase Order
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'purchase_report' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Purchase Orders
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-shopping-cart"></i> Purchase Order Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>PO Number:</strong> PO-{{ purchase_order.po_number }}</p>
+                        <p><strong>Supplier:</strong> {{ purchase_order.supplier.name }}</p>
+                        <p><strong>Order Date:</strong> {{ purchase_order.order_date|date:"M d, Y" }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Expected Date:</strong> {{ purchase_order.expected_date|date:"M d, Y" }}</p>
+                        <p><strong>Total Amount:</strong> ৳{{ purchase_order.total_amount|floatformat:2 }}</p>
+                        <p><strong>Status:</strong> 
+                            <span class="badge bg-warning">{{ purchase_order.get_status_display }}</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-boxes"></i> Batch Creation Preview
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    Completing this purchase order will create batches for all items and update stock levels.
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Quantity</th>
+                                <th>Unit Cost</th>
+                                <th>Total Cost</th>
+                                <th>Batch Number</th>
+                                <th>Expiry Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in purchase_order.items.all %}
+                            <tr>
+                                <td>
+                                    {{ item.product.name }}
+                                    {% if item.product.has_expiry %}
+                                    <span class="badge bg-info">Expiry Tracked</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.quantity }}</td>
+                                <td>৳{{ item.unit_cost|floatformat:2 }}</td>
+                                <td>৳{{ item.total_cost|floatformat:2 }}</td>
+                                <td>
+                                    {% if item.batch_number %}
+                                        <code>{{ item.batch_number }}</code>
+                                    {% else %}
+                                        <span class="text-muted">Auto-generated</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.expiry_date %}
+                                        {{ item.expiry_date|date:"M d, Y" }}
+                                    {% else %}
+                                        <span class="text-muted">{% if item.product.has_expiry %}Not set{% else %}N/A{% endif %}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Stock Update Summary -->
+                <div class="alert alert-warning mt-3">
+                    <h6><i class="fas fa-database"></i> Stock Update Summary</h6>
+                    <ul class="mb-0">
+                        <li>Will create {{ purchase_order.items.count }} batch(es)</li>
+                        <li>Will add {{ purchase_order.items.all|length }} product(s) to inventory</li>
+                        <li>Total quantity to be added: {{ purchase_order.items.all|total_quantity }} units</li>
+                        <li>Largest single quantity: {{ purchase_order.items.all|max_quantity }} units</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <form method="post" action="{% url 'mark_purchase_order_completed' purchase_order.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="create_batches" value="true">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-check"></i> Complete with Batches
+                            </button>
+                            <small class="form-text text-muted">
+                                Configure batch details before completion
+                            </small>
+                        </form>
+                    </div>
+                    <div class="col-md-4">
+                        <form method="post" action="{% url 'mark_purchase_order_completed' purchase_order.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="auto_create_batches" value="true">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-bolt"></i> Quick Complete
+                            </button>
+                            <small class="form-text text-muted">
+                                Auto-generate batch numbers
+                            </small>
+                        </form>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{% url 'purchase_report' %}" class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <small class="form-text text-muted">
+                            Return without completing
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Batch Information -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Batch Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <h6>What happens when you complete:</h6>
+                <ul class="small">
+                    <li>Product batches will be created for each item</li>
+                    <li>Stock levels will be updated automatically</li>
+                    <li>Batch numbers will be generated if not provided</li>
+                    <li>Expiry dates will be set for relevant products</li>
+                    <li>Purchase order status will change to "Completed"</li>
+                </ul>
+
+                <div class="alert alert-success">
+                    <h6 class="alert-heading">Batch Number Rules:</h6>
+                    <ul class="mb-0 small">
+                        <li>If batch number is provided, it will be used</li>
+                        <li>Otherwise, auto-generated as: BATCH-YYYYMMDD-ITEMID</li>
+                        <li>Expiry dates are required for expiry-tracked products</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Summary -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-cubes"></i> Products Summary
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    {% for item in purchase_order.items.all %}
+                    <div class="list-group-item px-0">
+                        <h6 class="mb-1">{{ item.product.name }}</h6>
+                        <small class="text-muted">
+                            SKU: {{ item.product.sku }}<br>
+                            Current Stock: {{ item.product.current_stock }}<br>
+                            Adding: {{ item.quantity }} units<br>
+                            New Stock: {{ item.product.current_stock|add:item.quantity }}
+                        </small>
+                        {% if item.product.has_expiry and not item.expiry_date %}
+                        <div class="alert alert-warning mt-2 p-2 small">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Expiry date required but not set
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add confirmation for the completion action
+    const completeForms = document.querySelectorAll('form');
+    completeForms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            if (!confirm('Are you sure you want to complete this purchase order? This action cannot be undone.')) {
+                e.preventDefault();
+            }
+        });
+    });
+
+    // Check for missing expiry dates on expiry-tracked products
+    const expiryWarnings = document.querySelectorAll('.alert-warning');
+    if (expiryWarnings.length > 0) {
+        const completeBtns = document.querySelectorAll('button[type="submit"]');
+        completeBtns.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                if (!confirm('Some products require expiry dates but none are set. Continue anyway?')) {
+                    e.preventDefault();
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1089 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}
+    {% if form.instance.pk %}Edit Purchase Order{% else %}Create Purchase Order{% endif %} - Shop Management
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-shopping-cart"></i>
+        {% if form.instance.pk %}Edit Purchase Order{% else %}Create Purchase Order{% endif %}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'purchase_report' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Purchases
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Purchase Order Form -->
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Purchase Order Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="purchaseOrderForm">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <!-- Supplier Selection -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.supplier.id_for_label }}" class="form-label">
+                                Supplier <span class="text-danger">*</span>
+                            </label>
+                            {{ form.supplier }}
+                            {% if form.supplier.errors %}
+                                <div class="text-danger small">{{ form.supplier.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">
+                                <a href="#" class="small" data-bs-toggle="modal" data-bs-target="#supplierModal">
+                                    <i class="fas fa-plus"></i> Add New Supplier
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Expected Delivery Date -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.expected_date.id_for_label }}" class="form-label">
+                                Expected Delivery Date <span class="text-danger">*</span>
+                            </label>
+                            {{ form.expected_date }}
+                            {% if form.expected_date.errors %}
+                                <div class="text-danger small">{{ form.expected_date.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Order Items Section -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">
+                                <i class="fas fa-list-ol"></i> Order Items
+                            </h6>
+                            <button type="button" class="btn btn-sm btn-success" id="addItemBtn">
+                                <i class="fas fa-plus"></i> Add Item
+                            </button>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm" id="orderItemsTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th width="25%">Product</th>
+                                        <th width="10%">Quantity</th>
+                                        <th width="12%">Unit Cost</th>
+                                        <th width="12%">Batch No.</th>
+                                        <th width="12%">Expiry Date</th>
+                                        <th width="14%">Total Cost</th>
+                                        <th width="15%">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="orderItemsBody">
+                                    <!-- Items will be added dynamically -->
+                                    <tr id="noItemsRow">
+                                        <td colspan="7" class="text-center text-muted py-4">
+                                            <i class="fas fa-cube fa-2x mb-2"></i><br>
+                                            No items added to this order
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-active">
+                                        <td colspan="5" class="text-end"><strong>Grand Total:</strong></td>
+                                        <td colspan="2">
+                                            <strong id="grandTotal">৳0.00</strong>
+                                            <input type="hidden" name="total_amount" id="totalAmount" value="0">
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Additional Notes -->
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Additional Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                  placeholder="Any special instructions or notes for this purchase order..."></textarea>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="row mt-4">
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-success w-100" id="submitBtn">
+                                <i class="fas fa-save"></i>
+                                {% if form.instance.pk %}Update Order{% else %}Create Order{% endif %}
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" class="btn btn-warning w-100" id="saveDraftBtn">
+                                <i class="fas fa-file-alt"></i> Save as Draft
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="{% url 'purchase_report' %}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Order Summary -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> Order Summary
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Total Items</small>
+                            <strong id="summaryTotalItems" class="text-primary">0</strong>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Total Quantity</small>
+                            <strong id="summaryTotalQty" class="text-info">0</strong>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="bg-light rounded p-3">
+                            <small class="text-muted d-block">Order Total</small>
+                            <strong id="summaryGrandTotal" class="text-success fs-5">৳0.00</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Products -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-bolt"></i> Quick Add Products
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-2" id="quickProducts">
+                    {% for product in quick_products %}
+                    <div class="col-12">
+                        <button type="button" class="btn btn-outline-primary w-100 text-start quick-product-btn" 
+                                data-product-id="{{ product.id }}"
+                                data-product-name="{{ product.name }}"
+                                data-product-sku="{{ product.sku }}"
+                                data-product-price="{{ product.cost_price }}"
+                                data-product-barcode="{{ product.barcode|default:'' }}">
+                            <small>
+                                <strong>{{ product.name }}</strong><br>
+                                <span class="text-muted">৳{{ product.cost_price|floatformat:2 }} • Stock: {{ product.current_stock }}</span>
+                            </small>
+                        </button>
+                    </div>
+                    {% empty %}
+                    <div class="col-12 text-center text-muted">
+                        <small>No low stock products found</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Card -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-question-circle"></i> Purchase Order Guide
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-lightbulb"></i> Best Practices
+                    </h6>
+                    <ul class="mb-0 small ps-3">
+                        <li>Verify supplier details before ordering</li>
+                        <li>Set realistic expected delivery dates</li>
+                        <li>Include all necessary product specifications</li>
+                        <li>Double-check quantities and unit costs</li>
+                        <li>Add batch numbers and expiry dates for perishable items</li>
+                    </ul>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-exclamation-triangle"></i> Important
+                    </h6>
+                    <p class="mb-0 small">
+                        Purchase orders cannot be edited after they are marked as "Completed". 
+                        Please review all details before submitting.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Product to Order</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addItemForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="productSearch" class="form-label">Search Product <span class="text-danger">*</span></label>
+                            <div class="position-relative">
+                                <input type="text" class="form-control" id="productSearch" placeholder="Search by name, SKU, or barcode..." autocomplete="off">
+                                <div class="search-dropdown" id="searchDropdown" style="display: none;">
+                                    <div class="search-results" id="searchResults">
+                                        <!-- Search results will appear here -->
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-text">Type to search products by name, SKU, or barcode. Use ↑↓ arrows to navigate, Enter to select</div>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="itemQuantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="itemQuantity" value="1" min="1" required>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="itemUnitCost" class="form-label">Unit Cost (৳) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="itemUnitCost" step="0.01" min="0" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="itemBatchNumber" class="form-label">Batch Number</label>
+                            <input type="text" class="form-control" id="itemBatchNumber" placeholder="Optional batch number">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="itemExpiryDate" class="form-label">Expiry Date</label>
+                            <input type="date" class="form-control" id="itemExpiryDate">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Total Cost</label>
+                        <div class="form-control bg-light">
+                            <strong id="itemTotalCost">৳0.00</strong>
+                        </div>
+                    </div>
+
+                    <!-- Product Info Display -->
+                    <div class="alert alert-info" id="productInfo" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Current Stock:</strong> <span id="currentStock">0</span>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>SKU:</strong> <span id="productSku">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmAddItem">Add to Order</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Supplier Modal -->
+<div class="modal fade" id="supplierModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Supplier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="supplierForm">
+                    <div class="mb-3">
+                        <label for="supplierName" class="form-label">Supplier Name</label>
+                        <input type="text" class="form-control" id="supplierName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="supplierContact" class="form-label">Contact Person</label>
+                        <input type="text" class="form-control" id="supplierContact">
+                    </div>
+                    <div class="mb-3">
+                        <label for="supplierEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="supplierEmail">
+                    </div>
+                    <div class="mb-3">
+                        <label for="supplierPhone" class="form-label">Phone</label>
+                        <input type="text" class="form-control" id="supplierPhone">
+                    </div>
+                    <div class="mb-3">
+                        <label for="supplierAddress" class="form-label">Address</label>
+                        <textarea class="form-control" id="supplierAddress" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveSupplier">Save Supplier</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Order items management
+let orderItems = [];
+let itemCounter = 0;
+let selectedProductIndex = -1;
+let searchResults = [];
+
+// Initialize products data
+const products = {
+    {% for product in products %}
+    {{ product.id }}: {
+        id: {{ product.id }},
+        name: "{{ product.name|escapejs }}",
+        sku: "{{ product.sku|escapejs }}",
+        barcode: "{{ product.barcode|default:''|escapejs }}",
+        cost_price: {{ product.cost_price }},
+        selling_price: {{ product.selling_price }},
+        current_stock: {{ product.current_stock }},
+        search_text: "{{ product.name|lower|escapejs }} {{ product.sku|lower|escapejs }} {{ product.barcode|default:''|lower|escapejs }}"
+    },
+    {% endfor %}
+};
+
+// Show add item modal
+document.getElementById('addItemBtn').addEventListener('click', function() {
+    const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
+    modal.show();
+    document.getElementById('productSearch').focus();
+});
+
+// Enhanced search functionality with keyboard navigation
+document.addEventListener('DOMContentLoaded', function() {
+    const productSearch = document.getElementById('productSearch');
+    const searchDropdown = document.getElementById('searchDropdown');
+    const searchResults = document.getElementById('searchResults');
+    const productInfo = document.getElementById('productInfo');
+
+    // Search function
+    function performSearch(searchTerm) {
+        searchResults.innerHTML = '';
+        selectedProductIndex = -1;
+        
+        if (searchTerm.length < 2) {
+            searchDropdown.style.display = 'none';
+            return;
+        }
+        
+        const filteredProducts = Object.values(products).filter(product => 
+            product.search_text.includes(searchTerm.toLowerCase())
+        ).slice(0, 8); // Limit to 8 results
+        
+        if (filteredProducts.length > 0) {
+            filteredProducts.forEach((product, index) => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'search-result-item';
+                resultItem.innerHTML = `
+                    <div class="search-result-content">
+                        <strong>${product.name}</strong>
+                        <small class="text-muted d-block">SKU: ${product.sku} | Stock: ${product.current_stock} | ৳${product.cost_price.toFixed(2)}</small>
+                    </div>
+                `;
+                resultItem.dataset.productId = product.id;
+                resultItem.dataset.index = index;
+                
+                resultItem.addEventListener('click', function() {
+                    selectProduct(product.id);
+                });
+                
+                resultItem.addEventListener('mouseenter', function() {
+                    setSelectedIndex(index);
+                });
+                
+                searchResults.appendChild(resultItem);
+            });
+            
+            searchDropdown.style.display = 'block';
+            setSelectedIndex(0); // Select first item by default
+        } else {
+            searchDropdown.style.display = 'none';
+        }
+    }
+
+    // Set selected index
+    function setSelectedIndex(index) {
+        const items = searchResults.querySelectorAll('.search-result-item');
+        items.forEach(item => item.classList.remove('selected'));
+        
+        if (items[index]) {
+            items[index].classList.add('selected');
+            selectedProductIndex = index;
+        }
+    }
+
+    // Select product
+    function selectProduct(productId) {
+        const product = products[productId];
+        if (product) {
+            productSearch.value = product.name;
+            document.getElementById('itemUnitCost').value = product.cost_price.toFixed(2);
+            document.getElementById('currentStock').textContent = product.current_stock;
+            document.getElementById('productSku').textContent = product.sku;
+            productInfo.style.display = 'block';
+            searchDropdown.style.display = 'none';
+            calculateItemTotal();
+            
+            // Auto-focus on quantity field for quick editing
+            document.getElementById('itemQuantity').focus();
+            document.getElementById('itemQuantity').select();
+        }
+    }
+
+    // Get current selected product
+    function getSelectedProduct() {
+        const items = searchResults.querySelectorAll('.search-result-item');
+        if (selectedProductIndex >= 0 && items[selectedProductIndex]) {
+            return products[items[selectedProductIndex].dataset.productId];
+        }
+        return null;
+    }
+
+    // Event listeners
+    productSearch.addEventListener('input', function() {
+        performSearch(this.value);
+    });
+
+    productSearch.addEventListener('keydown', function(e) {
+        const items = searchResults.querySelectorAll('.search-result-item');
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (selectedProductIndex < items.length - 1) {
+                setSelectedIndex(selectedProductIndex + 1);
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (selectedProductIndex > 0) {
+                setSelectedIndex(selectedProductIndex - 1);
+            }
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const selectedProduct = getSelectedProduct();
+            if (selectedProduct) {
+                selectProduct(selectedProduct.id);
+            } else if (productSearch.value.trim()) {
+                // Try to find exact match
+                const exactMatch = Object.values(products).find(p => 
+                    p.name.toLowerCase() === productSearch.value.toLowerCase()
+                );
+                if (exactMatch) {
+                    selectProduct(exactMatch.id);
+                }
+            }
+        } else if (e.key === 'Escape') {
+            searchDropdown.style.display = 'none';
+        }
+    });
+
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!productSearch.contains(e.target) && !searchDropdown.contains(e.target)) {
+            searchDropdown.style.display = 'none';
+        }
+    });
+
+    // Auto-add product when pressing Enter in quantity field
+    document.getElementById('itemQuantity').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const productSearch = document.getElementById('productSearch');
+            if (productSearch.value.trim()) {
+                document.getElementById('confirmAddItem').click();
+            }
+        }
+    });
+
+    // Auto-add product when pressing Enter in unit cost field
+    document.getElementById('itemUnitCost').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const productSearch = document.getElementById('productSearch');
+            if (productSearch.value.trim()) {
+                document.getElementById('confirmAddItem').click();
+            }
+        }
+    });
+});
+
+// Calculate item total cost
+function calculateItemTotal() {
+    const quantity = parseInt(document.getElementById('itemQuantity').value) || 0;
+    const unitCost = parseFloat(document.getElementById('itemUnitCost').value) || 0;
+    const total = quantity * unitCost;
+    document.getElementById('itemTotalCost').textContent = '৳' + total.toFixed(2);
+}
+
+// Recalculate when quantity or unit cost changes
+document.getElementById('itemQuantity').addEventListener('input', calculateItemTotal);
+document.getElementById('itemUnitCost').addEventListener('input', calculateItemTotal);
+
+// Add item to order
+document.getElementById('confirmAddItem').addEventListener('click', function() {
+    const productSearch = document.getElementById('productSearch');
+    const searchValue = productSearch.value.trim();
+    
+    if (!searchValue) {
+        alert('Please select a product.');
+        return;
+    }
+    
+    // Find product by name (exact match)
+    const product = Object.values(products).find(p => 
+        p.name.toLowerCase() === searchValue.toLowerCase()
+    );
+    
+    if (!product) {
+        alert('Please select a valid product from the search results.');
+        return;
+    }
+    
+    const quantity = parseInt(document.getElementById('itemQuantity').value);
+    const unitCost = parseFloat(document.getElementById('itemUnitCost').value);
+    const batchNumber = document.getElementById('itemBatchNumber').value;
+    const expiryDate = document.getElementById('itemExpiryDate').value;
+    
+    if (quantity <= 0) {
+        alert('Please enter a valid quantity.');
+        return;
+    }
+    
+    if (unitCost <= 0) {
+        alert('Please enter a valid unit cost.');
+        return;
+    }
+    
+    const productId = product.id;
+    
+    // Check if product already in order
+    const existingItem = orderItems.find(item => item.productId === productId);
+    if (existingItem) {
+        if (confirm('This product is already in the order. Do you want to update the quantity?')) {
+            existingItem.quantity += quantity;
+            existingItem.unitCost = unitCost;
+            existingItem.batchNumber = batchNumber;
+            existingItem.expiryDate = expiryDate;
+            existingItem.totalCost = existingItem.quantity * existingItem.unitCost;
+        } else {
+            return;
+        }
+    } else {
+        // Add new item
+        const item = {
+            id: itemCounter++,
+            productId: productId,
+            productName: product.name,
+            productSku: product.sku,
+            quantity: quantity,
+            unitCost: unitCost,
+            batchNumber: batchNumber,
+            expiryDate: expiryDate,
+            totalCost: quantity * unitCost
+        };
+        orderItems.push(item);
+    }
+    
+    updateOrderItemsDisplay();
+    updateOrderSummary();
+    
+    // Reset modal and close
+    document.getElementById('addItemForm').reset();
+    document.getElementById('productInfo').style.display = 'none';
+    document.getElementById('searchDropdown').style.display = 'none';
+    
+    // Show success message and keep modal open for quick additions
+    showNotification(`${product.name} added to order`, 'success');
+    
+    // Reset search and focus for next item
+    productSearch.value = '';
+    productSearch.focus();
+});
+
+// Update order items display with enhanced editing
+function updateOrderItemsDisplay() {
+    const tbody = document.getElementById('orderItemsBody');
+    const noItemsRow = document.getElementById('noItemsRow');
+    
+    if (orderItems.length === 0) {
+        noItemsRow.style.display = '';
+        tbody.innerHTML = '<tr id="noItemsRow"><td colspan="7" class="text-center text-muted py-4"><i class="fas fa-cube fa-2x mb-2"></i><br>No items added to this order</td></tr>';
+        return;
+    }
+    
+    noItemsRow.style.display = 'none';
+    
+    let html = '';
+    orderItems.forEach(item => {
+        html += `
+            <tr data-item-id="${item.id}" class="order-item-row">
+                <td>
+                    <strong>${item.productName}</strong><br>
+                    <small class="text-muted">SKU: ${item.productSku}</small>
+                    <input type="hidden" name="items[${item.id}].product" value="${item.productId}">
+                </td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <button type="button" class="btn btn-outline-secondary" onclick="decrementQuantity(${item.id})">-</button>
+                        <input type="number" class="form-control text-center" 
+                               name="items[${item.id}].quantity"
+                               value="${item.quantity}" min="1" 
+                               onchange="updateItemQuantity(${item.id}, this.value)"
+                               onblur="validateQuantity(${item.id}, this)">
+                        <button type="button" class="btn btn-outline-secondary" onclick="incrementQuantity(${item.id})">+</button>
+                    </div>
+                </td>
+                <td>
+                    <input type="number" class="form-control form-control-sm" 
+                           name="items[${item.id}].unit_cost"
+                           value="${item.unitCost.toFixed(2)}" step="0.01" min="0"
+                           onchange="updateItemUnitCost(${item.id}, this.value)"
+                           onblur="validateUnitCost(${item.id}, this)">
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm" 
+                           name="items[${item.id}].batch_number"
+                           value="${item.batchNumber}" 
+                           placeholder="Batch no.">
+                </td>
+                <td>
+                    <input type="date" class="form-control form-control-sm" 
+                           name="items[${item.id}].expiry_date"
+                           value="${item.expiryDate}">
+                </td>
+                <td class="text-end">৳${item.totalCost.toFixed(2)}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                            onclick="removeItem(${item.id})" title="Remove item">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+}
+
+// Quantity modification functions
+function incrementQuantity(itemId) {
+    const item = orderItems.find(item => item.id === itemId);
+    if (item) {
+        item.quantity += 1;
+        item.totalCost = item.quantity * item.unitCost;
+        updateOrderItemsDisplay();
+        updateOrderSummary();
+    }
+}
+
+function decrementQuantity(itemId) {
+    const item = orderItems.find(item => item.id === itemId);
+    if (item && item.quantity > 1) {
+        item.quantity -= 1;
+        item.totalCost = item.quantity * item.unitCost;
+        updateOrderItemsDisplay();
+        updateOrderSummary();
+    }
+}
+
+function validateQuantity(itemId, input) {
+    const quantity = parseInt(input.value) || 1;
+    if (quantity < 1) {
+        input.value = 1;
+        updateItemQuantity(itemId, 1);
+    }
+}
+
+function validateUnitCost(itemId, input) {
+    const unitCost = parseFloat(input.value) || 0;
+    if (unitCost < 0) {
+        input.value = '0.00';
+        updateItemUnitCost(itemId, 0);
+    }
+}
+
+// Update item quantity
+function updateItemQuantity(itemId, newQuantity) {
+    const quantity = parseInt(newQuantity) || 1;
+    const item = orderItems.find(item => item.id === itemId);
+    
+    if (item) {
+        item.quantity = quantity;
+        item.totalCost = item.quantity * item.unitCost;
+        updateOrderItemsDisplay();
+        updateOrderSummary();
+    }
+}
+
+// Update item unit cost
+function updateItemUnitCost(itemId, newUnitCost) {
+    const unitCost = parseFloat(newUnitCost) || 0;
+    const item = orderItems.find(item => item.id === itemId);
+    
+    if (item) {
+        item.unitCost = unitCost;
+        item.totalCost = item.quantity * item.unitCost;
+        updateOrderItemsDisplay();
+        updateOrderSummary();
+    }
+}
+
+// Remove item from order
+function removeItem(itemId) {
+    if (confirm('Are you sure you want to remove this item from the order?')) {
+        orderItems = orderItems.filter(item => item.id !== itemId);
+        updateOrderItemsDisplay();
+        updateOrderSummary();
+        showNotification('Item removed from order', 'warning');
+    }
+}
+
+// Update order summary
+function updateOrderSummary() {
+    const totalItems = orderItems.length;
+    const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+    const grandTotal = orderItems.reduce((sum, item) => sum + item.totalCost, 0);
+    
+    document.getElementById('summaryTotalItems').textContent = totalItems;
+    document.getElementById('summaryTotalQty').textContent = totalQuantity;
+    document.getElementById('summaryGrandTotal').textContent = '৳' + grandTotal.toFixed(2);
+    document.getElementById('grandTotal').textContent = '৳' + grandTotal.toFixed(2);
+    document.getElementById('totalAmount').value = grandTotal.toFixed(2);
+}
+
+// Quick add products
+document.querySelectorAll('.quick-product-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const productId = parseInt(this.dataset.productId);
+        const product = products[productId];
+        
+        if (product) {
+            // Check if product already in order
+            const existingItem = orderItems.find(item => item.productId === productId);
+            
+            if (existingItem) {
+                existingItem.quantity += 1;
+                existingItem.totalCost = existingItem.quantity * existingItem.unitCost;
+            } else {
+                const item = {
+                    id: itemCounter++,
+                    productId: productId,
+                    productName: product.name,
+                    productSku: product.sku,
+                    quantity: 1,
+                    unitCost: product.cost_price,
+                    batchNumber: '',
+                    expiryDate: '',
+                    totalCost: product.cost_price
+                };
+                orderItems.push(item);
+            }
+            
+            updateOrderItemsDisplay();
+            updateOrderSummary();
+            
+            // Show notification
+            showNotification(`${product.name} added to order`, 'success');
+        }
+    });
+});
+
+// Save supplier (placeholder function)
+document.getElementById('saveSupplier').addEventListener('click', function() {
+    const name = document.getElementById('supplierName').value;
+    
+    if (!name) {
+        alert('Please enter supplier name.');
+        return;
+    }
+    
+    // In a real implementation, this would send an AJAX request
+    alert(`Supplier "${name}" would be saved and added to the selection.`);
+    
+    // Close modal
+    bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();
+    document.getElementById('supplierForm').reset();
+});
+
+// Form submission
+document.getElementById('purchaseOrderForm').addEventListener('submit', function(e) {
+    if (orderItems.length === 0) {
+        e.preventDefault();
+        alert('Please add at least one item to the purchase order.');
+        return;
+    }
+    
+    // Add order items to form data
+    orderItems.forEach((item, index) => {
+        const prefix = `items[${index}]`;
+        const itemFields = `
+            <input type="hidden" name="${prefix}.product" value="${item.productId}">
+            <input type="hidden" name="${prefix}.quantity" value="${item.quantity}">
+            <input type="hidden" name="${prefix}.unit_cost" value="${item.unitCost}">
+            <input type="hidden" name="${prefix}.total_cost" value="${item.totalCost}">
+            <input type="hidden" name="${prefix}.batch_number" value="${item.batchNumber}">
+            <input type="hidden" name="${prefix}.expiry_date" value="${item.expiryDate}">
+        `;
+        this.insertAdjacentHTML('beforeend', itemFields);
+    });
+});
+
+// Save as draft
+document.getElementById('saveDraftBtn').addEventListener('click', function() {
+    if (orderItems.length === 0) {
+        alert('Please add at least one item to the purchase order.');
+        return;
+    }
+    
+    // Add draft flag
+    const draftField = document.createElement('input');
+    draftField.type = 'hidden';
+    draftField.name = 'draft';
+    draftField.value = 'true';
+    document.getElementById('purchaseOrderForm').appendChild(draftField);
+    
+    // Submit form
+    document.getElementById('purchaseOrderForm').submit();
+});
+
+// Show notification
+function showNotification(message, type = 'info') {
+    // Simple notification implementation
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alert);
+    
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    }, 3000);
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    updateOrderSummary();
+    
+    // Set minimum date for expected delivery to today
+    const today = new Date().toISOString().split('T')[0];
+    const expectedDateField = document.getElementById('{{ form.expected_date.id_for_label }}');
+    if (expectedDateField) {
+        expectedDateField.min = today;
+    }
+    
+    // Set minimum date for expiry date to today
+    document.getElementById('itemExpiryDate').min = today;
+});
+</script>
+
+<style>
+.form-label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+    border-radius: 0.375rem;
+    border: 1px solid #dee2e6;
+    padding: 0.5rem 0.75rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.btn {
+    border-radius: 0.375rem;
+    font-weight: 500;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.quick-product-btn {
+    text-align: left;
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+}
+
+.quick-product-btn:hover {
+    border-color: #0d6efd;
+    background-color: #f8f9fa;
+}
+
+.alert {
+    border: none;
+    border-radius: 0.375rem;
+}
+
+#noItemsRow {
+    display: table-row;
+}
+
+/* Enhanced search dropdown styling */
+.search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    z-index: 1060;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.search-result-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f8f9fa;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.search-result-item:hover {
+    background-color: #f8f9fa;
+}
+
+.search-result-item.selected {
+    background-color: #e7f1ff;
+    border-left: 3px solid #0d6efd;
+}
+
+.search-result-content strong {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.search-result-content small {
+    font-size: 0.8rem;
+}
+
+/* Enhanced quantity controls */
+.input-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+.input-group-sm .form-control {
+    padding: 0.25rem 0.5rem;
+}
+
+.order-item-row:hover {
+    background-color: #f8f9fa;
+}
+
+.order-item-row td {
+    vertical-align: middle;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.5rem;
+        border-radius: 0.375rem !important;
+    }
+    
+    .search-dropdown {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        max-width: calc(100vw - 20px);
+    }
+    
+    .input-group {
+        flex-wrap: nowrap;
+    }
+    
+    .input-group .btn {
+        padding: 0.125rem 0.375rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Focus styles for better accessibility */
+.form-control:focus,
+.btn:focus {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+/* Animation for smooth interactions */
+.search-result-item,
+.quick-product-btn,
+.order-item-row {
+    transition: all 0.2s ease-in-out;
+}
+</style>
+{% endblock %}

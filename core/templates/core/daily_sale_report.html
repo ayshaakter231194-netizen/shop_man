@@ -1,0 +1,1243 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Daily Sales Report - Shop Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-chart-line"></i> Daily Sales Report
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-success" onclick="exportToExcel()">
+                <i class="fas fa-file-excel"></i> Export Excel
+            </button>
+            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#printReportModal">
+                <i class="fas fa-print"></i> Print/PDF
+            </button>
+        </div>
+        <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Print Report Modal -->
+<div class="modal fade" id="printReportModal" tabindex="-1" aria-labelledby="printReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="printReportModalLabel">
+                    <i class="fas fa-print"></i> Generate Sales Report
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="printReportForm">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <!-- Report Type -->
+                        <div class="col-md-6">
+                            <label for="report_type" class="form-label">Report Type</label>
+                            <select class="form-select" id="report_type" name="report_type" required>
+                                <option value="daily">Daily Sales Report</option>
+                                <option value="date_range">Date Range Report</option>
+                                <option value="product_wise">Product Wise Report</option>
+                                <option value="category_wise">Category Wise Report</option>
+                                <option value="user_wise">User Wise Report</option>
+                                <option value="company_wise">Company Wise Report</option>
+                            </select>
+                        </div>
+
+                        <!-- Date Range -->
+                        <div class="col-md-6" id="dateRangeField">
+                            <label for="date_range" class="form-label">Date Range</label>
+                            <select class="form-select" id="date_range" name="date_range">
+                                <option value="today">Today</option>
+                                <option value="yesterday">Yesterday</option>
+                                <option value="this_week">This Week</option>
+                                <option value="last_week">Last Week</option>
+                                <option value="this_month">This Month</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+
+                        <!-- Custom Date Range -->
+                        <div class="col-md-6" id="customDateRange" style="display: none;">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" required>
+                        </div>
+                        <div class="col-md-6" id="customDateRangeEnd" style="display: none;">
+                            <label for="end_date" class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" required>
+                        </div>
+
+                        <!-- Product Filter -->
+                        <div class="col-md-6" id="productField" style="display: none;">
+                            <label for="product" class="form-label">Product</label>
+                            <select class="form-select" id="product" name="product">
+                                <option value="">All Products</option>
+                                {% for product in all_products %}
+                                <option value="{{ product.id }}">{{ product.name }} ({{ product.sku }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Category Filter -->
+                        <div class="col-md-6" id="categoryField" style="display: none;">
+                            <label for="category" class="form-label">Category</label>
+                            <select class="form-select" id="category" name="category">
+                                <option value="">All Categories</option>
+                                {% for category in all_categories %}
+                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- User Filter -->
+                        <div class="col-md-6" id="userField" style="display: none;">
+                            <label for="user" class="form-label">Sales Person</label>
+                            <select class="form-select" id="user" name="user">
+                                <option value="">All Users</option>
+                                {% for user in sales_users %}
+                                <option value="{{ user.id }}">{{ user.get_full_name|default:user.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Company Filter -->
+                        <div class="col-md-6" id="companyField" style="display: none;">
+                            <label for="company" class="form-label">Company</label>
+                            <select class="form-select" id="company" name="company">
+                                <option value="">All Companies</option>
+                                <option value="main">Main Company</option>
+                            </select>
+                        </div>
+
+                        <!-- Report Format -->
+                        <div class="col-md-6">
+                            <label for="report_format" class="form-label">Report Format</label>
+                            <select class="form-select" id="report_format" name="report_format">
+                                <option value="detailed">Detailed Report</option>
+                                <option value="summary">Summary Report</option>
+                            </select>
+                        </div>
+
+                        <!-- Include Returns -->
+                        <div class="col-md-6">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" id="include_returns" name="include_returns" checked>
+                                <label class="form-check-label" for="include_returns">
+                                    Include Returns Information
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Summary Preview -->
+                    <div class="mt-4 p-3 border rounded bg-light" id="reportPreview">
+                        <h6 class="mb-2">Report Preview:</h6>
+                        <small class="text-muted" id="previewText">Select report type to see preview</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="generatePrintReport()">
+                    <i class="fas fa-print"></i> Generate & Print
+                </button>
+                <button type="button" class="btn btn-success" onclick="downloadPDFReport()">
+                    <i class="fas fa-download"></i> Download PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters Card -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-filter"></i> Report Filters
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="get" id="reportFilterForm">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="date" class="form-label">Select Date</label>
+                    <input type="date" class="form-control" id="date" name="date" 
+                           value="{{ selected_date|date:'Y-m-d' }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="sales_person" class="form-label">Sales Person</label>
+                    <select class="form-select" id="sales_person" name="sales_person">
+                        <option value="">All Sales Persons</option>
+                        {% for user in sales_users %}
+                        <option value="{{ user.id }}" {% if request.GET.sales_person == user.id|stringformat:"i" %}selected{% endif %}>
+                            {{ user.get_full_name|default:user.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Date Filters -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a href="?date={{ today|date:'Y-m-d' }}" class="btn btn-outline-primary {% if selected_date == today %}active{% endif %}">
+                            Today
+                        </a>
+                        <a href="?date={{ yesterday|date:'Y-m-d' }}" class="btn btn-outline-primary {% if selected_date == yesterday %}active{% endif %}">
+                            Yesterday
+                        </a>
+                        <a href="?date={{ week_ago|date:'Y-m-d' }}" class="btn btn-outline-primary">
+                            7 Days Ago
+                        </a>
+                        <a href="?date={{ month_start|date:'Y-m-d' }}" class="btn btn-outline-primary">
+                            Month Start
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Returns Summary Card -->
+<div class="card border-warning mb-4">
+    <div class="card-header bg-warning text-dark">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-undo"></i> Returns Summary
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Gross Sales</h6>
+                        <h4 class="text-primary">৳{{ gross_sales|floatformat:2|intcomma }}</h4>
+                        <small class="text-muted">Before returns</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Total Returns</h6>
+                        <h4 class="text-danger">-৳{{ total_returns|floatformat:2|intcomma }}</h4>
+                        <small class="text-muted">Refunds & exchanges</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Net Sales</h6>
+                        <h4>৳{{ net_sales|floatformat:2|intcomma }}</h4>
+                        <small>After returns</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Return Rate</h6>
+                        <h4>
+                            {% if gross_sales > 0 %}
+                                {{ total_returns|floatformat:2 }}{% widthratio total_returns gross_sales 100 %}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </h4>
+                        <small>Of gross sales</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Items Returned Summary -->
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                    <span class="fw-bold">Items Sold:</span>
+                    <span class="badge bg-primary">{{ total_items_sold }}</span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                    <span class="fw-bold">Items Returned:</span>
+                    <span class="badge bg-danger">{{ total_items_returned }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Net Sales
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            ৳{{ net_sales|floatformat:2|intcomma }}
+                        </div>
+                        <small class="text-muted">After returns</small>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Total Transactions
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ sales.count }}
+                        </div>
+                        <small class="text-muted">Completed sales</small>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-receipt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Average Sale Value
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            ৳{{ average_sale|floatformat:2|intcomma }}
+                        </div>
+                        <small class="text-muted">Net per transaction</small>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-calculator fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Net Items Sold
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ net_items_sold }}
+                        </div>
+                        <small class="text-muted">After returns</small>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sales Chart -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i> Sales Trend - Last 7 Days (Net)
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="salesChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sales Transactions Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-list"></i> Sales Transactions for {{ selected_date|date:"F d, Y" }}
+            <span class="badge bg-primary">{{ sales.count }}</span>
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        {% if sales %}
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0" id="salesTable">
+                <thead class="table-light">
+                    <tr>
+                        <th width="120">Invoice #</th>
+                        <th>Customer</th>
+                        <th width="100" class="text-center">Items</th>
+                        <th width="100" class="text-center">Returns</th>
+                        <th width="110" class="text-end">Gross Amount</th>
+                        <th width="110" class="text-end">Returns</th>
+                        <th width="120" class="text-end">Net Amount</th>
+                        <th width="120" class="text-center">Time</th>
+                        <th width="100" class="text-center">Sold By</th>
+                        <th width="100" class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in sales %}
+                    <tr>
+                        <td>
+                            <strong class="text-primary">#{{ sale.invoice_number }}</strong>
+                            {% if sale.has_returns %}
+                            <span class="badge bg-warning ms-1" title="Has returns">R</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ sale.customer_name|default:"Walk-in Customer" }}
+                            {% if sale.customer_phone %}
+                            <br>
+                            <small class="text-muted">{{ sale.customer_phone }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-info">{{ sale.get_total_items }}</span>
+                        </td>
+                        <td class="text-center">
+                            {% if sale.total_returned_quantity > 0 %}
+                            <span class="badge bg-danger">{{ sale.total_returned_quantity }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            ৳{{ sale.total_amount|floatformat:2|intcomma }}
+                        </td>
+                        <td class="text-end">
+                            {% if sale.returned_amount > 0 %}
+                            <span class="text-danger">-৳{{ sale.returned_amount|floatformat:2|intcomma }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <strong class="{% if sale.net_amount == sale.total_amount %}text-dark{% else %}text-success{% endif %}">
+                                ৳{{ sale.net_amount|floatformat:2|intcomma }}
+                            </strong>
+                        </td>
+                        <td class="text-center">
+                            <small>{{ sale.sale_date|date:"h:i A" }}</small>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-secondary">{{ sale.sold_by.username }}</span>
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'generate_invoice' sale.invoice_number %}" 
+                                   class="btn btn-outline-primary" title="View Invoice">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if sale.has_returns %}
+                                <a href="{% url 'sale_return_list' %}?invoice={{ sale.invoice_number }}" 
+                                   class="btn btn-outline-warning" title="View Returns">
+                                    <i class="fas fa-undo"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-active">
+                    <tr>
+                        <td colspan="4" class="text-end"><strong>Totals:</strong></td>
+                        <td class="text-end"><strong>৳{{ gross_sales|floatformat:2|intcomma }}</strong></td>
+                        <td class="text-end"><strong class="text-danger">-৳{{ total_returns|floatformat:2|intcomma }}</strong></td>
+                        <td class="text-end"><strong>৳{{ net_sales|floatformat:2|intcomma }}</strong></td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-receipt fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">No Sales Found</h4>
+            <p class="text-muted">No sales transactions were recorded on {{ selected_date|date:"F d, Y" }}</p>
+            <a href="{% url 'pos_sale' %}" class="btn btn-primary">
+                <i class="fas fa-cash-register"></i> Create New Sale
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Recent Returns Section -->
+{% with recent_returns=sales|slice:":5" %}
+{% if recent_returns %}
+<div class="card mt-4">
+    <div class="card-header bg-light">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-undo text-warning"></i> Recent Returns Activity
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for sale in recent_returns %}
+            {% if sale.has_returns %}
+            <div class="col-md-6 mb-3">
+                <div class="card border-warning">
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>#{{ sale.invoice_number }}</strong>
+                                <small class="text-muted d-block">{{ sale.customer_name|default:"Walk-in Customer" }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="text-danger">-৳{{ sale.returned_amount|floatformat:2 }}</span>
+                                <br>
+                                <small class="text-muted">{{ sale.total_returned_quantity }} items</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- Top Products Card -->
+{% if top_products %}
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-star"></i> Top Selling Products (Net)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    {% for product in top_products %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ product.product__name }}</h6>
+                            <small class="text-muted">SKU: {{ product.product__sku }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-primary rounded-pill">{{ product.total_quantity }}</span>
+                            <br>
+                            <small class="text-muted">৳{{ product.total_amount|floatformat:2 }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+    </div>
+</div>
+
+<!-- Sales by Hour -->
+<div class="col-md-6">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-clock"></i> Sales by Hour (Net)
+            </h5>
+        </div>
+        <div class="card-body">
+            <canvas id="hourlySalesChart" height="200"></canvas>
+        </div>
+    </div>
+</div>
+</div>
+{% endif %}
+
+<!-- Loading Spinner Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h6 id="loadingMessage">Generating Report...</h6>
+                <p class="text-muted mb-0">Please wait</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Print Report Functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize report type change handler
+    const reportTypeSelect = document.getElementById('report_type');
+    const dateRangeField = document.getElementById('dateRangeField');
+    const productField = document.getElementById('productField');
+    const categoryField = document.getElementById('categoryField');
+    const userField = document.getElementById('userField');
+    const companyField = document.getElementById('companyField');
+    const customDateRange = document.getElementById('customDateRange');
+    const customDateRangeEnd = document.getElementById('customDateRangeEnd');
+    const dateRangeSelect = document.getElementById('date_range');
+    const previewText = document.getElementById('previewText');
+
+    // Show/hide fields based on report type
+    reportTypeSelect.addEventListener('change', function() {
+        const reportType = this.value;
+        
+        // Reset all fields
+        productField.style.display = 'none';
+        categoryField.style.display = 'none';
+        userField.style.display = 'none';
+        companyField.style.display = 'none';
+        dateRangeField.style.display = 'block';
+
+        // Show relevant fields based on report type
+        switch(reportType) {
+            case 'product_wise':
+                productField.style.display = 'block';
+                break;
+            case 'category_wise':
+                categoryField.style.display = 'block';
+                break;
+            case 'user_wise':
+                userField.style.display = 'block';
+                break;
+            case 'company_wise':
+                companyField.style.display = 'block';
+                break;
+        }
+
+        updatePreview();
+    });
+
+    // Handle date range changes
+    dateRangeSelect.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            customDateRange.style.display = 'block';
+            customDateRangeEnd.style.display = 'block';
+        } else {
+            customDateRange.style.display = 'none';
+            customDateRangeEnd.style.display = 'none';
+        }
+        updatePreview();
+    });
+
+    // Update form fields on change
+    document.querySelectorAll('#printReportForm select, #printReportForm input').forEach(element => {
+        element.addEventListener('change', updatePreview);
+    });
+
+    function updatePreview() {
+        const reportType = reportTypeSelect.value;
+        const dateRange = dateRangeSelect.value;
+        const format = document.getElementById('report_format').value;
+        const includeReturns = document.getElementById('include_returns').checked;
+        
+        let preview = `Report Type: ${reportType.replace('_', ' ').toUpperCase()}`;
+        preview += ` | Format: ${format}`;
+        preview += ` | Date Range: ${dateRange}`;
+        
+        if (dateRange === 'custom') {
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            preview += ` (${startDate} to ${endDate})`;
+        }
+        
+        if (includeReturns) {
+            preview += ` | Includes Returns`;
+        }
+
+        // Add specific filters based on report type
+        switch(reportType) {
+            case 'product_wise':
+                const product = document.getElementById('product').value;
+                if (product) {
+                    const productText = document.getElementById('product').options[document.getElementById('product').selectedIndex].text;
+                    preview += ` | Product: ${productText}`;
+                }
+                break;
+            case 'category_wise':
+                const category = document.getElementById('category').value;
+                if (category) {
+                    const categoryText = document.getElementById('category').options[document.getElementById('category').selectedIndex].text;
+                    preview += ` | Category: ${categoryText}`;
+                }
+                break;
+            case 'user_wise':
+                const user = document.getElementById('user').value;
+                if (user) {
+                    const userText = document.getElementById('user').options[document.getElementById('user').selectedIndex].text;
+                    preview += ` | User: ${userText}`;
+                }
+                break;
+            case 'company_wise':
+                const company = document.getElementById('company').value;
+                if (company) {
+                    preview += ` | Company: ${company}`;
+                }
+                break;
+        }
+
+        previewText.textContent = preview;
+    }
+
+    // Set default dates for custom range
+    const today = new Date().toISOString().split('T')[0];
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const oneWeekAgoStr = oneWeekAgo.toISOString().split('T')[0];
+    
+    document.getElementById('start_date').value = oneWeekAgoStr;
+    document.getElementById('end_date').value = today;
+
+    // Initialize preview
+    updatePreview();
+});
+
+// Show loading modal
+function showLoadingModal(message = 'Generating Report...') {
+    document.getElementById('loadingMessage').textContent = message;
+    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    loadingModal.show();
+    return loadingModal;
+}
+
+// Hide loading modal
+function hideLoadingModal(modal) {
+    if (modal) {
+        modal.hide();
+    }
+}
+
+// Generate Print Report
+function generatePrintReport() {
+    const form = document.getElementById('printReportForm');
+    const formData = new FormData(form);
+    
+    // Validate custom date range
+    if (formData.get('date_range') === 'custom') {
+        const startDate = formData.get('start_date');
+        const endDate = formData.get('end_date');
+        if (!startDate || !endDate) {
+            showNotification('Please select both start and end dates for custom range.', 'error');
+            return;
+        }
+        if (startDate > endDate) {
+            showNotification('Start date cannot be after end date.', 'error');
+            return;
+        }
+    }
+
+    formData.append('action', 'print');
+    
+    // Show loading modal
+    const loadingModal = showLoadingModal('Generating Print Report...');
+    
+    // Create a form and submit it to open in new window
+    const printForm = document.createElement('form');
+    printForm.method = 'POST';
+    printForm.action = '{% url "generate_sales_report" %}';
+    printForm.target = '_blank';
+    printForm.style.display = 'none';
+
+    // Add all form data
+    for (let [key, value] of formData.entries()) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        printForm.appendChild(input);
+    }
+
+    // Add CSRF token
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = '{{ csrf_token }}';
+    printForm.appendChild(csrfInput);
+
+    document.body.appendChild(printForm);
+    printForm.submit();
+    document.body.removeChild(printForm);
+
+    // Hide loading modal after a short delay
+    setTimeout(() => {
+        hideLoadingModal(loadingModal);
+        
+        // Close the print modal
+        const printModal = bootstrap.Modal.getInstance(document.getElementById('printReportModal'));
+        printModal.hide();
+        
+        showNotification('Print report generated successfully! Opening in new window...', 'success');
+    }, 2000);
+}
+
+// Download PDF Report
+function downloadPDFReport() {
+    const form = document.getElementById('printReportForm');
+    const formData = new FormData(form);
+    
+    // Validate custom date range
+    if (formData.get('date_range') === 'custom') {
+        const startDate = formData.get('start_date');
+        const endDate = formData.get('end_date');
+        if (!startDate || !endDate) {
+            showNotification('Please select both start and end dates for custom range.', 'error');
+            return;
+        }
+        if (startDate > endDate) {
+            showNotification('Start date cannot be after end date.', 'error');
+            return;
+        }
+    }
+
+    formData.append('action', 'download_pdf');
+
+    // Show loading modal
+    const loadingModal = showLoadingModal('Generating PDF Report...');
+    
+    // Send POST request to generate PDF
+    fetch('{% url "generate_sales_report" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+    })
+    .then(response => {
+        if (response.ok && response.headers.get('content-type') === 'application/pdf') {
+            // It's a PDF file, download it
+            return response.blob().then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                // Get filename from Content-Disposition header or create default
+                const contentDisposition = response.headers.get('content-disposition');
+                let filename = 'sales_report.pdf';
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                return { success: true };
+            });
+        } else if (response.headers.get('content-type')?.includes('application/json')) {
+            // It's a JSON error response
+            return response.json().then(data => {
+                throw new Error(data.error || 'Unknown error occurred');
+            });
+        } else {
+            // Other error
+            throw new Error('Server returned an error response');
+        }
+    })
+    .then(result => {
+        hideLoadingModal(loadingModal);
+        
+        // Close the print modal
+        const printModal = bootstrap.Modal.getInstance(document.getElementById('printReportModal'));
+        printModal.hide();
+        
+        showNotification('PDF report downloaded successfully!', 'success');
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        hideLoadingModal(loadingModal);
+        showNotification('Error generating PDF: ' + error.message, 'error');
+    });
+}
+
+// Export to Excel
+function exportToExcel() {
+    const table = document.getElementById('salesTable');
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+        let row = [], cols = rows[i].querySelectorAll('td, th');
+        
+        for (let j = 0; j < cols.length; j++) {
+            // Remove any HTML tags and get clean text
+            let text = cols[j].innerText.replace(/,/g, '').replace(/\n/g, ' ');
+            row.push(text);
+        }
+        
+        csv.push(row.join(","));
+    }
+    
+    // Download CSV file
+    const csvFile = new Blob([csv.join("\n")], {type: "text/csv"});
+    const downloadLink = document.createElement("a");
+    downloadLink.download = `daily_sales_report_{{ selected_date|date:'Y-m-d' }}.csv`;
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+    downloadLink.style.display = "none";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    
+    showNotification('Report exported to Excel successfully!', 'success');
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    // Remove any existing notifications
+    const existingAlerts = document.querySelectorAll('.alert-position-fixed');
+    existingAlerts.forEach(alert => alert.remove());
+    
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show alert-position-fixed`;
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 1060; min-width: 300px; position: fixed;';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alert);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    }, 5000);
+}
+
+// Initialize charts
+function initializeCharts() {
+    // Sales Trend Chart (Last 7 Days) - Net Sales
+    const salesCtx = document.getElementById('salesChart');
+    if (salesCtx) {
+        const salesChart = new Chart(salesCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: {{ last_7_days_labels|safe }},
+                datasets: [{
+                    label: 'Net Sales (৳)',
+                    data: {{ last_7_days_data|safe }},
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: true
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Net Sales: ৳' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '৳' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Hourly Sales Chart - Net Sales
+    {% if hourly_sales %}
+    const hourlyCtx = document.getElementById('hourlySalesChart');
+    if (hourlyCtx) {
+        const hourlyChart = new Chart(hourlyCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: {{ hourly_labels|safe }},
+                datasets: [{
+                    label: 'Net Sales (৳)',
+                    data: {{ hourly_data|safe }},
+                    backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '৳' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    {% endif %}
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+    
+    // Set default date to today if not set
+    const dateInput = document.getElementById('date');
+    if (!dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+    
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'e') {
+            e.preventDefault();
+            exportToExcel();
+        }
+        if (e.ctrlKey && e.key === 'p') {
+            e.preventDefault();
+            const printModal = new bootstrap.Modal(document.getElementById('printReportModal'));
+            printModal.show();
+        }
+    });
+});
+</script>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.border-left-primary {
+    border-left: 0.25rem solid #4e73df !important;
+}
+
+.border-left-success {
+    border-left: 0.25rem solid #1cc88a !important;
+}
+
+.border-left-info {
+    border-left: 0.25rem solid #36b9cc !important;
+}
+
+.border-left-warning {
+    border-left: 0.25rem solid #f6c23e !important;
+}
+
+.text-xs {
+    font-size: 0.7rem;
+}
+
+/* Additional styles for print modal */
+.modal-content {
+    border-radius: 10px;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-bottom: none;
+}
+
+.modal-header .btn-close {
+    filter: invert(1);
+}
+
+#reportPreview {
+    background: #f8f9fa;
+    border-left: 4px solid #0d6efd;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+/* Loading modal styles */
+#loadingModal .modal-content {
+    border: none;
+    border-radius: 15px;
+}
+
+#loadingModal .spinner-border {
+    border-width: 3px;
+}
+
+/* Print styles enhancement */
+@media print {
+    .no-print, .btn-toolbar, .card-header .btn, .modal, .navbar, .footer,
+    .alert-position-fixed {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #000 !important;
+        box-shadow: none !important;
+    }
+    
+    .table {
+        font-size: 10pt !important;
+    }
+    
+    body {
+        background: white !important;
+        font-size: 11pt !important;
+    }
+    
+    .table th {
+        background-color: #f8f9fa !important;
+        color: #000 !important;
+    }
+    
+    .card-header {
+        background-color: #f8f9fa !important;
+        color: #000 !important;
+        border-bottom: 2px solid #000 !important;
+    }
+    
+    .bg-primary, .bg-success, .bg-info, .bg-warning {
+        color: #000 !important;
+    }
+    
+    .print-break {
+        page-break-after: always;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.5rem;
+        border-radius: 0.375rem !important;
+    }
+    
+    .card-body .row {
+        margin-bottom: -0.5rem;
+    }
+    
+    .card-body .row > div {
+        margin-bottom: 0.5rem;
+    }
+    
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+}
+
+/* Hover effects */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.075);
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* Chart container */
+canvas {
+    max-width: 100%;
+}
+
+/* Returns styling */
+.bg-returns {
+    background-color: #fff3cd !important;
+    border-color: #ffeaa7 !important;
+}
+
+/* Alert positioning */
+.alert-position-fixed {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+</style>
+{% endblock %}

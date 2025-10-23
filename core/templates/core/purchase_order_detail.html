@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Purchase Order #{{ purchase_order.po_number }}{% endblock %}
+
+{% block inner_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-file-purchase"></i> Purchase Order: PO-{{ purchase_order.po_number }}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{% url 'purchase_report' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Orders
+            </a>
+            {% if purchase_order.status == 'pending' %}
+            <button type="button" class="btn btn-sm btn-success" 
+                    onclick="markCompleted({{ purchase_order.id }})">
+                <i class="fas fa-check"></i> Mark Completed
+            </button>
+            <button type="button" class="btn btn-sm btn-danger" 
+                    onclick="cancelOrder({{ purchase_order.id }})">
+                <i class="fas fa-times"></i> Cancel Order
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Order Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Order Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th>PO Number:</th>
+                                <td>PO-{{ purchase_order.po_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>Supplier:</th>
+                                <td>{{ purchase_order.supplier.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>Order Date:</th>
+                                <td>{{ purchase_order.order_date|date:"M d, Y" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th>Expected Date:</th>
+                                <td>{{ purchase_order.expected_date|date:"M d, Y" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Status:</th>
+                                <td>
+                                    <span class="badge 
+                                        {% if purchase_order.status == 'completed' %}bg-success
+                                        {% elif purchase_order.status == 'pending' %}bg-warning
+                                        {% else %}bg-danger{% endif %}">
+                                        {{ purchase_order.status|title }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Created By:</th>
+                                <td>{{ purchase_order.created_by.get_full_name }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Items -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Order Items</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>SKU</th>
+                                <th class="text-center">Quantity</th>
+                                <th class="text-end">Unit Cost</th>
+                                <th class="text-end">Total Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in purchase_order.items.all %}
+                            <tr>
+                                <td>{{ item.product.name }}</td>
+                                <td>{{ item.product.sku }}</td>
+                                <td class="text-center">{{ item.quantity }}</td>
+                                <td class="text-end">৳{{ item.unit_cost|floatformat:2|intcomma }}</td>
+                                <td class="text-end">৳{{ item.total_cost|floatformat:2|intcomma }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-active">
+                            <tr>
+                                <td colspan="3"></td>
+                                <td class="text-end"><strong>Total:</strong></td>
+                                <td class="text-end"><strong>৳{{ total_cost|floatformat:2|intcomma }}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Order Summary -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Order Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-3">
+                    <strong>Total Items:</strong>
+                    <span class="h5">{{ total_items }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <strong>Total Products:</strong>
+                    <span class="h5">{{ purchase_order.items.count }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <strong>Total Amount:</strong>
+                    <span class="h5 text-success">৳{{ total_cost|floatformat:2|intcomma }}</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <strong>Order Age:</strong>
+                    <span>{{ purchase_order.order_date|timesince }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'purchase_report' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-list"></i> View All Orders
+                    </a>
+                    <a href="{% url 'purchase_report' %}?supplier={{ purchase_order.supplier.id }}" class="btn btn-outline-info">
+                        <i class="fas fa-filter"></i> Orders from {{ purchase_order.supplier.name }}
+                    </a>
+                    {% if purchase_order.status == 'completed' and purchase_order.supplierbill %}
+                    <a href="{% url 'supplier_bill_detail' purchase_order.supplierbill.id %}" class="btn btn-outline-success">
+                        <i class="fas fa-file-invoice-dollar"></i> View Bill
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Supplier Information -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Supplier Information</h5>
+            </div>
+            <div class="card-body">
+                <h6>{{ purchase_order.supplier.name }}</h6>
+                {% if purchase_order.supplier.contact_person %}
+                <p class="mb-1"><strong>Contact:</strong> {{ purchase_order.supplier.contact_person }}</p>
+                {% endif %}
+                {% if purchase_order.supplier.phone %}
+                <p class="mb-1"><strong>Phone:</strong> {{ purchase_order.supplier.phone }}</p>
+                {% endif %}
+                {% if purchase_order.supplier.email %}
+                <p class="mb-1"><strong>Email:</strong> {{ purchase_order.supplier.email }}</p>
+                {% endif %}
+                {% if purchase_order.supplier.address %}
+                <p class="mb-0"><strong>Address:</strong><br>{{ purchase_order.supplier.address }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Order Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cancel Purchase Order</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to cancel this purchase order?</p>
+                <form id="cancelForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="cancelReason" class="form-label">Reason for cancellation:</label>
+                        <textarea class="form-control" id="cancelReason" name="reason" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" onclick="confirmCancel()">Cancel Order</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentOrderId = null;
+
+function markCompleted(orderId) {
+    if (confirm('Mark this purchase order as completed? This will update stock levels and create a supplier bill.')) {
+        fetch(`/purchase-order/${orderId}/complete/`, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error);
+        });
+    }
+}
+
+function cancelOrder(orderId) {
+    currentOrderId = orderId;
+    const modal = new bootstrap.Modal(document.getElementById('cancelModal'));
+    modal.show();
+}
+
+function confirmCancel() {
+    const reason = document.getElementById('cancelReason').value;
+    if (!reason.trim()) {
+        alert('Please provide a reason for cancellation.');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('reason', reason);
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    fetch(`/purchase-order/${currentOrderId}/cancel/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+    });
+}
+</script>
+{% endblock %}

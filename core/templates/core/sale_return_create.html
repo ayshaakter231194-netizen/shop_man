@@ -1,0 +1,369 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Sale Return{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Create Sale Return</h3>
+            </div>
+            <div class="card-body">
+                <form method="post" id="mainForm">
+                    {% csrf_token %}
+                    <div class="form-group position-relative">
+                        <label for="invoice_number">Enter Invoice Number</label>
+                        <input type="text" class="form-control" id="invoice_number" name="invoice_number" 
+                               placeholder="Start typing invoice number, customer name or phone..." 
+                               required
+                               autocomplete="off">
+                        <div id="invoice_suggestions" class="dropdown-menu w-100" style="display: none; max-height: 300px; overflow-y: auto;">
+                            <!-- Suggestions will appear here -->
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3">Find Invoice</button>
+                </form>
+                
+                <hr>
+                
+                <h5>Quick Search</h5>
+                <div class="form-group">
+                    <input type="text" class="form-control" id="invoice_search" 
+                           placeholder="Search by invoice number, customer name or phone...">
+                    <div id="search_results" class="mt-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Recent Sales</h3>
+            </div>
+            <div class="card-body">
+                {% for sale in recent_sales %}
+                <div class="border-bottom pb-2 mb-2">
+                    <strong>{{ sale.invoice_number }}</strong><br>
+                    {{ sale.customer_name }} - ৳{{ sale.total_amount }}<br>
+                    <small class="text-muted">{{ sale.sale_date|date:"M d, Y H:i" }}</small><br>
+                    <a href="{% url 'add_sale_return_items' sale.id %}" class="btn btn-sm btn-outline-primary mt-1">Select</a>
+                </div>
+                {% empty %}
+                <p class="text-muted">No recent sales found.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Quick Stats Card -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title">Quick Stats</h3>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <h4 class="text-primary mb-0">{{ recent_sales.count }}</h4>
+                            <small class="text-muted">Recent Sales</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div>
+                            <h4 class="text-success mb-0">{{ today_sales.count }}</h4>
+                            <small class="text-muted">Today's Sales</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    let currentSuggestions = [];
+    let selectedIndex = -1;
+    const invoiceInput = $('#invoice_number');
+    const suggestionsContainer = $('#invoice_suggestions');
+
+    // Debounce function to limit API calls
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Load invoice suggestions
+    const loadSuggestions = debounce(function(query) {
+        if (query.length < 2) {
+            hideSuggestions();
+            return;
+        }
+
+        $.get('{% url "search_invoice_for_return" %}?q=' + encodeURIComponent(query), function(data) {
+            currentSuggestions = data;
+            displaySuggestions(data);
+        }).fail(function() {
+            hideSuggestions();
+        });
+    }, 300);
+
+    // Display suggestions
+    function displaySuggestions(suggestions) {
+        if (suggestions.length === 0) {
+            hideSuggestions();
+            return;
+        }
+
+        let html = '';
+        suggestions.forEach((sale, index) => {
+            const isSelected = index === selectedIndex ? 'active' : '';
+            html += `
+                <a class="dropdown-item ${isSelected}" href="#" data-sale-id="${sale.id}" data-invoice="${sale.invoice_number}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>${sale.invoice_number}</strong>
+                            <br>
+                            <small class="text-muted">${sale.customer_name} - ${sale.customer_phone}</small>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-success">৳${sale.total_amount}</small>
+                            <br>
+                            <small class="text-danger">Returned: ৳${sale.total_returned}</small>
+                        </div>
+                    </div>
+                    <small class="text-muted">${sale.sale_date} • ${sale.sold_by}</small>
+                </a>
+            `;
+        });
+
+        suggestionsContainer.html(html);
+        showSuggestions();
+    }
+
+    // Show suggestions dropdown
+    function showSuggestions() {
+        suggestionsContainer.show();
+        selectedIndex = -1;
+    }
+
+    // Hide suggestions dropdown
+    function hideSuggestions() {
+        suggestionsContainer.hide();
+        selectedIndex = -1;
+        currentSuggestions = [];
+    }
+
+    // Select suggestion
+    function selectSuggestion(index) {
+        const items = suggestionsContainer.find('.dropdown-item');
+        items.removeClass('active');
+        
+        if (index >= 0 && index < items.length) {
+            items.eq(index).addClass('active');
+            selectedIndex = index;
+            
+            // Scroll to selected item
+            const selectedItem = items.eq(index);
+            const container = suggestionsContainer[0];
+            const itemTop = selectedItem.position().top;
+            const itemBottom = itemTop + selectedItem.outerHeight();
+            const containerTop = container.scrollTop;
+            const containerBottom = containerTop + container.clientHeight;
+            
+            if (itemTop < 0) {
+                container.scrollTop += itemTop;
+            } else if (itemBottom > containerBottom) {
+                container.scrollTop += (itemBottom - containerBottom);
+            }
+        }
+    }
+
+    // Handle suggestion click
+    function handleSuggestionClick(saleId, invoiceNumber) {
+        invoiceInput.val(invoiceNumber);
+        hideSuggestions();
+        
+        // Auto-submit the form
+        setTimeout(() => {
+            $('#mainForm').submit();
+        }, 100);
+    }
+
+    // Event handlers
+    invoiceInput.on('input', function() {
+        const query = $(this).val();
+        loadSuggestions(query);
+    });
+
+    invoiceInput.on('focus', function() {
+        const query = $(this).val();
+        if (query.length >= 2 && currentSuggestions.length > 0) {
+            showSuggestions();
+        }
+    });
+
+    // Keyboard navigation
+    invoiceInput.on('keydown', function(e) {
+        const items = suggestionsContainer.find('.dropdown-item');
+        
+        switch(e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                if (items.length > 0) {
+                    const newIndex = (selectedIndex + 1) % items.length;
+                    selectSuggestion(newIndex);
+                }
+                break;
+                
+            case 'ArrowUp':
+                e.preventDefault();
+                if (items.length > 0) {
+                    const newIndex = selectedIndex <= 0 ? items.length - 1 : selectedIndex - 1;
+                    selectSuggestion(newIndex);
+                }
+                break;
+                
+            case 'Enter':
+                if (selectedIndex >= 0 && currentSuggestions[selectedIndex]) {
+                    e.preventDefault();
+                    const sale = currentSuggestions[selectedIndex];
+                    handleSuggestionClick(sale.id, sale.invoice_number);
+                }
+                break;
+                
+            case 'Escape':
+                hideSuggestions();
+                break;
+                
+            case 'Tab':
+                hideSuggestions();
+                break;
+        }
+    });
+
+    // Handle suggestion clicks
+    suggestionsContainer.on('click', '.dropdown-item', function(e) {
+        e.preventDefault();
+        const saleId = $(this).data('sale-id');
+        const invoiceNumber = $(this).data('invoice');
+        handleSuggestionClick(saleId, invoiceNumber);
+    });
+
+    // Hide suggestions when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('#invoice_number, #invoice_suggestions').length) {
+            hideSuggestions();
+        }
+    });
+
+    // Quick search functionality (existing)
+    $('#invoice_search').on('input', debounce(function() {
+        const query = $(this).val();
+        if (query.length >= 2) {
+            $.get('{% url "search_invoice_for_return" %}?q=' + encodeURIComponent(query), function(data) {
+                let html = '';
+                if (data.length > 0) {
+                    data.forEach(function(sale) {
+                        html += `
+                            <div class="border-bottom pb-2 mb-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>${sale.invoice_number}</strong><br>
+                                        ${sale.customer_name} - ${sale.customer_phone}<br>
+                                        <small class="text-muted">${sale.sale_date} by ${sale.sold_by}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="text-success">৳${sale.total_amount}</div>
+                                        <small class="text-danger">Returned: ৳${sale.total_returned}</small>
+                                    </div>
+                                </div>
+                                <a href="{% url 'add_sale_return_items' 0 %}".replace('0', sale.id) 
+                                   class="btn btn-sm btn-outline-primary mt-1">Select</a>
+                            </div>`;
+                    });
+                } else {
+                    html = '<div class="text-muted">No invoices found matching your search.</div>';
+                }
+                $('#search_results').html(html);
+            });
+        } else {
+            $('#search_results').html('');
+        }
+    }, 300));
+
+    // Form submission handling
+    $('#mainForm').on('submit', function(e) {
+        const invoiceNumber = invoiceInput.val().trim();
+        if (!invoiceNumber) {
+            e.preventDefault();
+            alert('Please enter an invoice number');
+            return false;
+        }
+    });
+
+    // Auto-focus on invoice input
+    invoiceInput.focus();
+});
+</script>
+
+<style>
+.dropdown-item.active {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.dropdown-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f8f9fa;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.dropdown-menu {
+    border: 1px solid #dee2e6;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+}
+
+#invoice_suggestions {
+    top: 100% !important;
+    left: 0 !important;
+    transform: none !important;
+}
+
+.form-group.position-relative {
+    margin-bottom: 1.5rem;
+}
+
+.text-success {
+    font-weight: 600;
+}
+
+.text-danger {
+    font-size: 0.875em;
+}
+
+.border-end {
+    border-right: 1px solid #dee2e6 !important;
+}
+</style>
+{% endblock %}

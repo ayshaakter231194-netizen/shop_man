@@ -1,0 +1,977 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Profit Report - Shop Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-chart-line"></i> Profit Report (Net)
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-success" onclick="exportToExcel()">
+                <i class="fas fa-file-excel"></i> Export Excel
+            </button>
+            <button type="button" class="btn btn-sm btn-danger" onclick="printReport()">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <button type="button" class="btn btn-sm btn-info" onclick="showProfitAnalysis()">
+                <i class="fas fa-chart-bar"></i> Analysis
+            </button>
+        </div>
+        <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Returns Impact Summary -->
+<div class="card border-warning mb-4">
+    <div class="card-header bg-warning text-dark">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-exchange-alt"></i> Returns Impact on Profitability
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Gross Revenue</h6>
+                        <h4 class="text-primary">৳{{ gross_revenue|floatformat:2|intcomma }}</h4>
+                        <small class="text-muted">Before returns</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Total Returns</h6>
+                        <h4 class="text-danger">-৳{{ total_returns_amount|floatformat:2|intcomma }}</h4>
+                        <small class="text-muted">Refunds & exchanges</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h6 class="card-title">Net Revenue</h6>
+                        <h4>৳{{ total_revenue|floatformat:2|intcomma }}</h4>
+                        <small>After returns</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Note:</strong> All profit calculations are based on net revenue after accounting for returns and refunds. Returned product costs are excluded from total costs.
+                    Return rate: {% if gross_revenue > 0 %}{{ total_returns_amount|floatformat:2 }}{% widthratio total_returns_amount gross_revenue 100 %}%{% else %}0%{% endif %} of gross revenue.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Net Revenue
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            ৳{{ total_revenue|floatformat:2|intcomma }}
+                        </div>
+                        <small class="text-muted">After returns</small>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Net Profit
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            ৳{{ total_profit|floatformat:2|intcomma }}
+                        </div>
+                        <small class="text-muted">After returns</small>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-money-bill-wave fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Net Profit Margin
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ profit_margin|floatformat:2 }}%
+                        </div>
+                        <small class="text-muted">On net revenue</small>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-percentage fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Net Cost
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            ৳{{ total_cost|floatformat:2|intcomma }}
+                        </div>
+                        <small class="text-muted">After returns</small>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-receipt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card border-left-secondary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">
+                            Net Sales Count
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ total_sales }}
+                        </div>
+                        <small class="text-muted">Completed sales</small>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-shopping-cart fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card border-left-danger shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                            Avg. Net Profit/Sale
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            ৳{{ avg_profit_per_sale|floatformat:2|intcomma }}
+                        </div>
+                        <small class="text-muted">After returns</small>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-calculator fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters Card -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-filter"></i> Report Filters
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="get" id="profitFilterForm">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label for="start_date" class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" 
+                           value="{{ start_date|date:'Y-m-d' }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="end_date" class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" 
+                           value="{{ end_date|date:'Y-m-d' }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="category" class="form-label">Category</label>
+                    <select class="form-select" id="category" name="category">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:"i" %}selected{% endif %}>
+                            {{ category.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="period" class="form-label">View By</label>
+                    <select class="form-select" id="period" name="period">
+                        <option value="daily" {% if request.GET.period == 'daily' %}selected{% endif %}>Daily</option>
+                        <option value="weekly" {% if request.GET.period == 'weekly' %}selected{% endif %}>Weekly</option>
+                        <option value="monthly" {% if request.GET.period == 'monthly' or not request.GET.period %}selected{% endif %}>Monthly</option>
+                        <option value="yearly" {% if request.GET.period == 'yearly' %}selected{% endif %}>Yearly</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-chart-line"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Filters -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a href="?start_date={{ today|date:'Y-m-d' }}&end_date={{ today|date:'Y-m-d' }}" 
+                           class="btn btn-outline-primary {% if start_date == today and end_date == today %}active{% endif %}">
+                            Today
+                        </a>
+                        <a href="?start_date={{ week_start|date:'Y-m-d' }}&end_date={{ week_end|date:'Y-m-d' }}" 
+                           class="btn btn-outline-primary {% if start_date == week_start and end_date == week_end %}active{% endif %}">
+                            This Week
+                        </a>
+                        <a href="?start_date={{ month_start|date:'Y-m-d' }}&end_date={{ month_end|date:'Y-m-d' }}" 
+                           class="btn btn-outline-primary {% if start_date == month_start and end_date == month_end %}active{% endif %}">
+                            This Month
+                        </a>
+                        <a href="?start_date={{ year_start|date:'Y-m-d' }}&end_date={{ year_end|date:'Y-m-d' }}" 
+                           class="btn btn-outline-primary {% if start_date == year_start and end_date == year_end %}active{% endif %}">
+                            This Year
+                        </a>
+                        <a href="?" class="btn btn-outline-secondary">
+                            <i class="fas fa-sync"></i> Clear Filters
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Profit Overview Charts -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line"></i> Net Profit Trend - {{ period_display }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="profitTrendChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> Net Profit Distribution
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="profitDistributionChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-gradient-primary text-white">
+            <div class="card-body text-center">
+                <h6 class="card-title">Highest Net Profit Day</h6>
+                <h4 class="mb-1">৳{{ best_day.profit|floatformat:2|intcomma }}</h4>
+                <small>{{ best_day.date }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-gradient-success text-white">
+            <div class="card-body text-center">
+                <h6 class="card-title">Best Net Profit Margin</h6>
+                <h4 class="mb-1">{{ best_margin.margin|floatformat:2 }}%</h4>
+                <small>After returns</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-gradient-warning text-white">
+            <div class="card-body text-center">
+                <h6 class="card-title">Most Profitable Product</h6>
+                <h6 class="mb-1">{{ best_product.product__name|truncatewords:3|default:"N/A" }}</h6>
+                <small>৳{{ best_product.total_profit|floatformat:2|intcomma }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-gradient-info text-white">
+            <div class="card-body text-center">
+                <h6 class="card-title">Best Category</h6>
+                <h6 class="mb-1">{{ best_category.name|truncatewords:2|default:"N/A" }}</h6>
+                <small>৳{{ best_category.total_profit|floatformat:2|intcomma }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Products by Net Profit -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-trophy"></i> Top 5 Products by Net Profit
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    {% for product in top_products %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ product.product__name }}</h6>
+                            <small class="text-muted">Category: {{ product.product__category__name }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-success rounded-pill">৳{{ product.total_profit|floatformat:2|intcomma }}</span>
+                            <br>
+                            <small class="text-muted">{{ product.total_quantity }} net sold</small>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-info-circle"></i> No product data available
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Net Profit by Category -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tags"></i> Net Profit by Category
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Category</th>
+                                <th class="text-end">Net Revenue</th>
+                                <th class="text-end">Cost</th>
+                                <th class="text-end">Net Profit</th>
+                                <th class="text-end">Margin</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category in category_profits %}
+                            <tr>
+                                <td>
+                                    <strong>{{ category.name }}</strong>
+                                </td>
+                                <td class="text-end">৳{{ category.total_revenue|default:0|floatformat:2|intcomma }}</td>
+                                <td class="text-end">৳{{ category.total_cost|default:0|floatformat:2|intcomma }}</td>
+                                <td class="text-end">
+                                    <strong class="{% if category.total_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                        ৳{{ category.total_profit|default:0|floatformat:2|intcomma }}
+                                    </strong>
+                                </td>
+                                <td class="text-end">
+                                    <span class="badge {% if category.profit_margin >= 20 %}bg-success{% elif category.profit_margin >= 10 %}bg-warning{% else %}bg-danger{% endif %}">
+                                        {{ category.profit_margin|default:0|floatformat:1 }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-3">
+                                    <i class="fas fa-info-circle"></i> No category data available
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Daily Net Profit Breakdown -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-table"></i> Daily Net Profit Breakdown
+            <span class="badge bg-primary">{{ sales_data|length }}</span>
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        {% if sales_data %}
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0" id="profitTable">
+                <thead class="table-light">
+                    <tr>
+                        <th width="120">Date</th>
+                        <th width="100" class="text-center">Items</th>
+                        <th width="100" class="text-center">Returns</th>
+                        <th width="120" class="text-end">Gross Revenue</th>
+                        <th width="120" class="text-end">Returns Amount</th>
+                        <th width="120" class="text-end">Net Revenue</th>
+                        <th width="120" class="text-end">Net Cost</th>
+                        <th width="120" class="text-end">Net Profit</th>
+                        <th width="100" class="text-end">Net Margin</th>
+                        <th width="100" class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for data in sales_data %}
+                    <tr>
+                        <td>
+                            <strong>{{ data.sale.sale_date|date:"M d, Y" }}</strong>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-info">{{ data.sale.items.count }}</span>
+                        </td>
+                        <td class="text-center">
+                            {% if data.sale.has_returns %}
+                            <span class="badge bg-warning">{{ data.sale.total_returned_quantity }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">৳{{ data.sale.total_amount|floatformat:2|intcomma }}</td>
+                        <td class="text-end">
+                            {% if data.sale.returned_amount > 0 %}
+                            <span class="text-danger">-৳{{ data.sale.returned_amount|floatformat:2|intcomma }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <strong>৳{{ data.sale.net_amount|floatformat:2|intcomma }}</strong>
+                        </td>
+                        <td class="text-end">৳{{ data.cost|floatformat:2|intcomma }}</td>
+                        <td class="text-end">
+                            <strong class="{% if data.profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                ৳{{ data.profit|floatformat:2|intcomma }}
+                            </strong>
+                        </td>
+                        <td class="text-end">
+                            <span class="badge {% if data.margin >= 20 %}bg-success{% elif data.margin >= 10 %}bg-warning{% else %}bg-danger{% endif %}">
+                                {{ data.margin|floatformat:1 }}%
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-outline-primary" 
+                                    onclick="showDayDetails('{{ data.sale.sale_date|date:"Y-m-d" }}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-active">
+                    <tr>
+                        <td colspan="3" class="text-end"><strong>Totals:</strong></td>
+                        <td class="text-end"><strong>৳{{ gross_revenue|floatformat:2|intcomma }}</strong></td>
+                        <td class="text-end"><strong class="text-danger">-৳{{ total_returns_amount|floatformat:2|intcomma }}</strong></td>
+                        <td class="text-end"><strong>৳{{ total_revenue|floatformat:2|intcomma }}</strong></td>
+                        <td class="text-end"><strong>৳{{ total_cost|floatformat:2|intcomma }}</strong></td>
+                        <td class="text-end">
+                            <strong class="{% if total_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                ৳{{ total_profit|floatformat:2|intcomma }}
+                            </strong>
+                        </td>
+                        <td class="text-end">
+                            <strong>{{ profit_margin|floatformat:2 }}%</strong>
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-chart-line fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">No Profit Data Found</h4>
+            <p class="text-muted">No sales data available for the selected period.</p>
+            <a href="{% url 'pos_sale' %}" class="btn btn-success">
+                <i class="fas fa-cash-register"></i> Create Sale
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Day Details Modal -->
+<div class="modal fade" id="dayDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Sales Details for <span id="modalDate"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="dayDetailsContent">
+                <!-- Content will be loaded via AJAX -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Profit Analysis Modal -->
+<div class="modal fade" id="profitAnalysisModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Net Profit Analysis (After Returns)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Profitability Insights</h6>
+                        <div id="profitabilityInsights">
+                            <!-- Insights will be generated dynamically -->
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Recommendations</h6>
+                        <div id="profitRecommendations">
+                            <!-- Recommendations will be generated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Initialize Charts
+function initializeCharts() {
+    // Net Profit Trend Chart
+    const trendCtx = document.getElementById('profitTrendChart').getContext('2d');
+    const trendChart = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: {{ trend_labels|safe }},
+            datasets: [
+                {
+                    label: 'Net Revenue (৳)',
+                    data: {{ revenue_data|safe }},
+                    borderColor: '#4e73df',
+                    backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Net Profit (৳)',
+                    data: {{ profit_data|safe }},
+                    borderColor: '#1cc88a',
+                    backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: true
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ৳' + context.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '৳' + value.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Net Profit Distribution Chart
+    const distributionCtx = document.getElementById('profitDistributionChart').getContext('2d');
+    const distributionChart = new Chart(distributionCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Net Revenue', 'Product Cost', 'Net Profit'],
+            datasets: [{
+                data: [{{ total_revenue }}, {{ total_cost }}, {{ total_profit }}],
+                backgroundColor: ['#4e73df', '#e74a3b', '#1cc88a'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            return `${label}: ৳${value.toLocaleString()}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Show day details
+function showDayDetails(date) {
+    document.getElementById('modalDate').textContent = new Date(date).toLocaleDateString();
+    
+    // Show loading
+    document.getElementById('dayDetailsContent').innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading sales details...</p>
+        </div>
+    `;
+    
+    const modal = new bootstrap.Modal(document.getElementById('dayDetailsModal'));
+    modal.show();
+    
+    // In a real implementation, you would fetch day details via AJAX
+    setTimeout(() => {
+        document.getElementById('dayDetailsContent').innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                Sales details for ${date} would be loaded via AJAX.
+            </div>
+            <p>This would show:</p>
+            <ul>
+                <li>All sales transactions for the day</li>
+                <li>Return details and refund amounts</li>
+                <li>Product-wise net profit breakdown</li>
+                <li>Customer analysis</li>
+                <li>Hourly profit distribution</li>
+            </ul>
+        `;
+    }, 1000);
+}
+
+// Show profit analysis
+function showProfitAnalysis() {
+    const insights = document.getElementById('profitabilityInsights');
+    const recommendations = document.getElementById('profitRecommendations');
+    
+    // Generate insights based on data
+    const margin = {{ profit_margin }};
+    const avgProfit = {{ avg_profit_per_sale }};
+    const returnRate = {% if gross_revenue > 0 %}{{ total_returns_amount|floatformat:2 }}{% widthratio total_returns_amount gross_revenue 100 %}{% else %}0{% endif %};
+    
+    let insightHTML = '<ul class="list-unstyled">';
+    let recommendationHTML = '<ul class="list-unstyled">';
+    
+    // Profit margin insights
+    if (margin > 25) {
+        insightHTML += '<li><i class="fas fa-check text-success"></i> <strong>Excellent Net Profitability:</strong> Your business maintains high profitability even after returns</li>';
+        recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Consider expanding product lines with similar return rates</li>';
+    } else if (margin > 15) {
+        insightHTML += '<li><i class="fas fa-check text-success"></i> <strong>Good Net Profitability:</strong> Healthy profit margins after accounting for returns</li>';
+        recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Focus on high-margin products with low return rates</li>';
+    } else if (margin > 5) {
+        insightHTML += '<li><i class="fas fa-exclamation-triangle text-warning"></i> <strong>Moderate Net Profitability:</strong> Returns are impacting overall profitability</li>';
+        recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Review return reasons and improve product quality</li>';
+    } else {
+        insightHTML += '<li><i class="fas fa-times text-danger"></i> <strong>Low Net Profitability:</strong> Returns are significantly affecting profits</li>';
+        recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Immediate attention needed to reduce return rates</li>';
+    }
+    
+    // Return rate insights
+    if (returnRate > 10) {
+        insightHTML += '<li><i class="fas fa-exclamation-triangle text-danger"></i> <strong>High Return Rate:</strong> ' + returnRate.toFixed(1) + '% of revenue lost to returns</li>';
+        recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Implement better quality control and return prevention</li>';
+    } else if (returnRate > 5) {
+        insightHTML += '<li><i class="fas fa-info-circle text-info"></i> <strong>Moderate Return Rate:</strong> ' + returnRate.toFixed(1) + '% of revenue returned</li>';
+        recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Monitor return trends and address common issues</li>';
+    } else {
+        insightHTML += '<li><i class="fas fa-check text-success"></i> <strong>Low Return Rate:</strong> Only ' + returnRate.toFixed(1) + '% of revenue returned</li>';
+        recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Maintain current quality standards</li>';
+    }
+    
+    // Average profit insights
+    if (avgProfit > 100) {
+        insightHTML += '<li><i class="fas fa-check text-success"></i> <strong>High Net Value Sales:</strong> Good average net profit per sale</li>';
+    } else {
+        insightHTML += '<li><i class="fas fa-exclamation-triangle text-warning"></i> <strong>Low Net Value Sales:</strong> Consider upselling strategies to increase profit</li>';
+        recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Implement upselling and cross-selling techniques</li>';
+    }
+    
+    insightHTML += '</ul>';
+    
+    recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Focus on products with high net profit margins</li>';
+    recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Regularly review return patterns and reasons</li>';
+    recommendationHTML += '<li><i class="fas fa-lightbulb text-warning"></i> Optimize inventory based on net profitability</li>';
+    recommendationHTML += '</ul>';
+    
+    insights.innerHTML = insightHTML;
+    recommendations.innerHTML = recommendationHTML;
+    
+    const modal = new bootstrap.Modal(document.getElementById('profitAnalysisModal'));
+    modal.show();
+}
+
+// Export to Excel
+function exportToExcel() {
+    const table = document.getElementById('profitTable');
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+        let row = [], cols = rows[i].querySelectorAll('td, th');
+        
+        for (let j = 0; j < cols.length; j++) {
+            let text = cols[j].innerText;
+            text = text.replace(/[\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+            row.push(text);
+        }
+        
+        csv.push(row.join(","));
+    }
+    
+    // Download CSV file
+    const csvFile = new Blob([csv.join("\n")], {type: "text/csv"});
+    const downloadLink = document.createElement("a");
+    downloadLink.download = `net_profit_report_${new Date().toISOString().slice(0,10)}.csv`;
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+    downloadLink.style.display = "none";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    
+    showNotification('Net profit report exported successfully!', 'success');
+}
+
+// Print report
+function printReport() {
+    window.print();
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alert);
+    
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    }, 3000);
+}
+
+// Date validation
+document.getElementById('end_date').addEventListener('change', function() {
+    const startDate = document.getElementById('start_date').value;
+    const endDate = this.value;
+    
+    if (startDate && endDate && startDate > endDate) {
+        alert('End date cannot be before start date.');
+        this.value = startDate;
+    }
+});
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+    
+    // Set default dates if not set
+    const startDate = document.getElementById('start_date');
+    const endDate = document.getElementById('end_date');
+    
+    if (!startDate.value) {
+        startDate.value = '{{ month_start|date:"Y-m-d" }}';
+    }
+    if (!endDate.value) {
+        endDate.value = '{{ month_end|date:"Y-m-d" }}';
+    }
+    
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'e') {
+            e.preventDefault();
+            exportToExcel();
+        }
+        if (e.ctrlKey && e.key === 'p') {
+            e.preventDefault();
+            printReport();
+        }
+        if (e.ctrlKey && e.key === 'a') {
+            e.preventDefault();
+            showProfitAnalysis();
+        }
+    });
+});
+</script>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.border-left-primary { border-left: 0.25rem solid #4e73df !important; }
+.border-left-success { border-left: 0.25rem solid #1cc88a !important; }
+.border-left-info { border-left: 0.25rem solid #36b9cc !important; }
+.border-left-warning { border-left: 0.25rem solid #f6c23e !important; }
+.border-left-secondary { border-left: 0.25rem solid #858796 !important; }
+.border-left-danger { border-left: 0.25rem solid #e74a3b !important; }
+
+.text-xs {
+    font-size: 0.7rem;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.bg-gradient-primary { background: linear-gradient(45deg, #4e73df, #224abe); }
+.bg-gradient-success { background: linear-gradient(45deg, #1cc88a, #13855c); }
+.bg-gradient-warning { background: linear-gradient(45deg, #f6c23e, #dda20a); }
+.bg-gradient-info { background: linear-gradient(45deg, #36b9cc, #258391); }
+
+/* Print styles */
+@media print {
+    .btn-toolbar, .card-header .btn, .no-print {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #000 !important;
+        box-shadow: none !important;
+    }
+    
+    .table {
+        font-size: 10pt !important;
+    }
+    
+    body {
+        background: white !important;
+        font-size: 11pt !important;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.5rem;
+        border-radius: 0.375rem !important;
+    }
+}
+
+/* Hover effects */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.075);
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* Chart container */
+canvas {
+    max-width: 100%;
+}
+
+/* Returns impact styling */
+.returns-impact {
+    background: linear-gradient(45deg, #fff3cd, #ffeaa7);
+    border-left: 4px solid #f39c12 !important;
+}
+</style>
+{% endblock %}

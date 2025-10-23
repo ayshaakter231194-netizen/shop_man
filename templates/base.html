@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Shop Management System{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        
+        .main-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #1a2530 100%);
+            box-shadow: 0 4px 12px rgba(0,0,0,.1);
+            z-index: 1030;
+            border-bottom: 3px solid var(--secondary-color);
+        }
+        
+        .header-brand {
+            color: white;
+            font-weight: 700;
+            text-decoration: none;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .header-brand:hover {
+            color: var(--light-color);
+            text-decoration: none;
+        }
+        
+        .brand-icon {
+            background-color: var(--secondary-color);
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,.2);
+        }
+        
+        .user-dropdown .dropdown-toggle {
+            color: rgba(255,255,255,.9);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        
+        .user-dropdown .dropdown-toggle:hover {
+            color: #fff;
+            background-color: rgba(255,255,255,.1);
+        }
+        
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--secondary-color) 0%, #2980b9 100%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,.2);
+        }
+        
+        .dropdown-menu {
+            border: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            padding: 8px;
+        }
+        
+        .dropdown-item {
+            border-radius: 6px;
+            margin: 2px 0;
+            padding: 8px 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .dropdown-item:hover {
+            background-color: #e9ecef;
+            color: var(--primary-color);
+        }
+        
+        .dropdown-item.logout-item {
+            color: var(--accent-color);
+        }
+        
+        .dropdown-item.logout-item:hover {
+            background-color: #f8d7da;
+            color: var(--accent-color);
+        }
+        
+        .sidebar {
+            min-height: calc(100vh - 76px);
+            background-color: white;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            border-right: 1px solid #e9ecef;
+        }
+        
+        .sidebar-sticky {
+            position: sticky;
+            top: 0;
+            height: calc(100vh - 76px);
+            padding-top: 1rem;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        
+        .nav-link {
+            color: #495057;
+            border-radius: 0.375rem;
+            margin: 0.1rem 0;
+            font-weight: 500;
+            padding: 10px 15px;
+            transition: all 0.2s;
+        }
+        
+        .nav-link:hover {
+            color: var(--secondary-color);
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        
+        .nav-link.active {
+            color: var(--secondary-color);
+            background-color: rgba(52, 152, 219, 0.1);
+            font-weight: 600;
+        }
+        
+        .nav-link-due {
+            color: var(--accent-color);
+        }
+        
+        .nav-link-collection {
+            color: var(--success-color);
+        }
+        
+        .nav-link-due:hover {
+            color: var(--accent-color);
+            background-color: rgba(231, 76, 60, 0.1);
+        }
+        
+        .nav-link-collection:hover {
+            color: var(--success-color);
+            background-color: rgba(39, 174, 96, 0.1);
+        }
+        
+        .quick-actions-section {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .system-status-footer {
+            margin-top: auto;
+            padding: 1rem;
+            border-top: 1px solid #e9ecef;
+            background-color: #f8f9fa;
+            border-radius: 0 0 0 8px;
+        }
+        
+        .page-header {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,.05);
+            border-left: 4px solid var(--secondary-color);
+        }
+        
+        .notification-toast {
+            position: fixed;
+            top: 90px;
+            right: 20px;
+            z-index: 1060;
+            min-width: 300px;
+            box-shadow: 0 4px 12px rgba(0,0,0,.15);
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                min-height: auto;
+            }
+            
+            .header-brand {
+                font-size: 1.2rem;
+            }
+            
+            .brand-icon {
+                width: 32px;
+                height: 32px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Menu -->
+    {% if user.is_authenticated %}
+    <header class="main-header">
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container-fluid">
+                <!-- Brand/Home Link -->
+                <a class="navbar-brand header-brand" href="{% url 'dashboard' %}">
+                    <div class="brand-icon">
+                        <i class="fas fa-store"></i>
+                    </div>
+                    Shop Management System
+                </a>
+                
+                <!-- Mobile Toggle Button -->
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                
+                <!-- Navigation Items -->
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav ms-auto">
+                        <!-- User Dropdown -->
+                        <li class="nav-item dropdown user-dropdown">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <div class="user-avatar">
+                                    {{ user.username|first|upper }}
+                                </div>
+                                <span>{{ user.username }}</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                <!-- Fixed Logout Form -->
+                                <li>
+                                    <form method="post" action="{% url 'logout' %}" class="d-inline w-100">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item logout-item border-0 bg-transparent w-100 text-start">
+                                            <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+    {% endif %}
+
+    <!-- Main Layout -->
+    {% block content %}
+        {% if user.is_authenticated %}
+        <div class="container-fluid">
+            <div class="row">
+                <!-- Sidebar -->
+                <nav class="col-md-3 col-lg-2 d-md-block sidebar">
+                    <div class="sidebar-sticky">
+                        <ul class="nav flex-column">
+                            <!-- Dashboard -->
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'dashboard' %}">
+                                    <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                                </a>
+                            </li>
+
+                            <!-- Inventory Management Dropdown -->
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                                    <i class="fas fa-boxes me-2"></i> Inventory
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'product_list' %}">
+                                            <i class="fas fa-box me-2"></i> Products
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'stock_adjustment' %}">
+                                            <i class="fas fa-exchange-alt me-2"></i> Stock Adjustment
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'stock_report' %}">
+                                            <i class="fas fa-chart-bar me-2"></i> Stock Report
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'expiry_report' %}">
+                                            <i class="fas fa-calendar-times me-2"></i> Expiry Report
+                                            {% with expired_count=0 %}
+                                            {% if expired_count > 0 %}
+                                                <span class="badge bg-danger float-end">{{ expired_count }}</span>
+                                            {% endif %}
+                                            {% endwith %}
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'batch_management' %}">
+                                            <i class="fas fa-boxes me-2"></i> Batch Management
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'write_off_expired' %}">
+                                            <i class="fas fa-trash-alt me-2"></i> Write Off Expired
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+
+                            <!-- Sales Dropdown -->
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                                    <i class="fas fa-cash-register me-2"></i> Sales
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'pos_sale' %}">
+                                            <i class="fas fa-cash-register me-2"></i> POS Sale
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'daily_sale_report' %}">
+                                            <i class="fas fa-chart-bar me-2"></i> Sales Report
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'sale_return_list' %}">
+                                            <i class="fas fa-undo me-2"></i> Sale Returns
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'sale_return_create' %}">
+                                            <i class="fas fa-plus-circle me-2"></i> Create Sale Return
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+
+                            <!-- Purchase Management Dropdown -->
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                                    <i class="fas fa-shopping-cart me-2"></i> Purchases
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'purchase_order_create' %}">
+                                            <i class="fas fa-file-purchase me-2"></i> Create Purchase Order
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'purchase_report' %}">
+                                            <i class="fas fa-list me-2"></i> Purchase Orders
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'purchase_return_list' %}">
+                                            <i class="fas fa-undo me-2"></i> Purchase Returns
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'create_purchase_return' %}">
+                                            <i class="fas fa-plus-circle me-2"></i> Create Return
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+
+                            <!-- Supplier Billing Dropdown -->
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                                    <i class="fas fa-file-invoice-dollar me-2"></i> Billing
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'supplier_bills' %}">
+                                            <i class="fas fa-list me-2"></i> All Bills
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'bill_dashboard' %}">
+                                            <i class="fas fa-tachometer-alt me-2"></i> Bill Dashboard
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'supplier_bills' %}?status=overdue">
+                                            <i class="fas fa-exclamation-triangle text-danger me-2"></i> Overdue Bills
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'supplier_bills' %}?status=pending">
+                                            <i class="fas fa-clock text-warning me-2"></i> Pending Bills
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'supplier_bills' %}?status=partial">
+                                            <i class="fas fa-money-bill-wave text-info me-2"></i> Partial Payments
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+
+                            <!-- Reports Dropdown -->
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                                    <i class="fas fa-chart-bar me-2"></i> Reports
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'daily_sale_report' %}">
+                                            <i class="fas fa-calendar-day me-2"></i> Daily Sales
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'stock_report' %}">
+                                            <i class="fas fa-boxes me-2"></i> Stock Report
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'purchase_report' %}">
+                                            <i class="fas fa-shopping-cart me-2"></i> Purchase Report
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'profit_report' %}">
+                                            <i class="fas fa-chart-line me-2"></i> Profit Report
+                                        </a>
+                                    </li>
+                                    <!-- Due Reports in Reports Dropdown -->
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'customer_due_report' %}">
+                                            <i class="fas fa-file-invoice-dollar text-danger me-2"></i> Customer Due Report
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'due_collection_report' %}">
+                                            <i class="fas fa-money-bill-wave text-success me-2"></i> Collection Report
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'expiry_report' %}">
+                                            <i class="fas fa-calendar-times me-2"></i> Expiry Report
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'purchase_return_list' %}">
+                                            <i class="fas fa-undo me-2"></i> Purchase Returns Report
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'sale_return_list' %}">
+                                            <i class="fas fa-exchange-alt me-2"></i> Sale Returns Report
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'supplier_bills' %}">
+                                            <i class="fas fa-file-invoice me-2"></i> Bill Reports
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+
+                            <!-- User Management (Admin Only) -->
+                            {% if user.is_superuser or user.userprofile.role == 'admin' %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                                    <i class="fas fa-users-cog me-2"></i> Administration
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'create_user' %}">
+                                            <i class="fas fa-user-plus me-2"></i> Create User
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'batch_management' %}">
+                                            <i class="fas fa-database me-2"></i> Batch Management
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'write_off_expired' %}">
+                                            <i class="fas fa-trash-restore me-2"></i> Write Off Management
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                            {% endif %}
+
+                            <!-- Quick Actions Section -->
+                            <div class="quick-actions-section">
+                                <li class="nav-item">
+                                    <small class="text-muted px-3">QUICK ACTIONS</small>
+                                </li>
+                                
+                                <!-- Quick POS -->
+                                <li class="nav-item">
+                                    <a class="nav-link text-success" href="{% url 'pos_sale' %}">
+                                        <i class="fas fa-bolt me-2"></i> Quick POS
+                                    </a>
+                                </li>
+
+                                <!-- Quick Due Collection -->
+                                <li class="nav-item">
+                                    <a class="nav-link nav-link-collection" href="{% url 'due_collection_report' %}?date_from={% now 'Y-m-d' %}">
+                                        <i class="fas fa-money-bill-wave me-2"></i> Today's Collection
+                                    </a>
+                                </li>
+
+                                <!-- Quick Due Customers -->
+                                <li class="nav-item">
+                                    <a class="nav-link nav-link-due" href="{% url 'customer_due_report' %}?due_status=with_due">
+                                        <i class="fas fa-exclamation-circle me-2"></i> Due Customers
+                                    </a>
+                                </li>
+
+                                <!-- Quick Stock Check -->
+                                <li class="nav-item">
+                                    <a class="nav-link text-info" href="{% url 'stock_report' %}?stock_status=low">
+                                        <i class="fas fa-exclamation-triangle me-2"></i> Low Stock Alert
+                                    </a>
+                                </li>
+
+                                <!-- Quick Expiry Check -->
+                                <li class="nav-item">
+                                    <a class="nav-link text-warning" href="{% url 'expiry_report' %}?days=7">
+                                        <i class="fas fa-clock me-2"></i> Week Expiry Alert
+                                    </a>
+                                </li>
+                            </div>
+                        </ul>
+
+                        <!-- System Status Footer -->
+                        <div class="system-status-footer">
+                            <small class="text-muted">
+                                <i class="fas fa-database me-1"></i> 
+                                {% now "Y-m-d H:i" %}
+                                <br>
+                                <i class="fas fa-server me-1"></i> 
+                                Production
+                            </small>
+                        </div>
+                    </div>
+                </nav>
+
+                <!-- Main Content Area -->
+                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-3">
+                    <!-- Breadcrumb -->
+                    {% block breadcrumb %}
+                    <nav aria-label="breadcrumb" class="mb-4">
+                        <ol class="breadcrumb">
+                            {% block breadcrumb_items %}{% endblock %}
+                        </ol>
+                    </nav>
+                    {% endblock %}
+
+                    <!-- Page Header -->
+                    {% block page_header %}
+                    <div class="page-header">
+                        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center">
+                            <h1 class="h2 mb-0">
+                                {% block page_title %}
+                                <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                                {% endblock %}
+                            </h1>
+                            <div class="btn-toolbar mb-2 mb-md-0">
+                                {% block page_actions %}
+                                <!-- Page-specific actions go here -->
+                                {% endblock %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endblock %}
+
+                    <!-- Messages -->
+                    {% if messages %}
+                    <div class="mt-3">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            <i class="fas 
+                                {% if message.tags == 'success' %}fa-check-circle
+                                {% elif message.tags == 'error' or message.tags == 'danger' %}fa-exclamation-circle
+                                {% elif message.tags == 'warning' %}fa-exclamation-triangle
+                                {% elif message.tags == 'info' %}fa-info-circle
+                                {% else %}fa-bell{% endif %} me-2"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Page specific content -->
+                    {% block inner_content %}
+                    <!-- Child templates will override this block -->
+                    {% endblock %}
+                </main>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- Public layout for non-authenticated users -->
+        <div class="container mt-4">
+            {% block public_content %}
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="card shadow">
+                        <div class="card-body text-center py-5">
+                            <i class="fas fa-store fa-4x text-primary mb-3"></i>
+                            <h2 class="card-title">Shop Management System</h2>
+                            <p class="card-text text-muted">
+                                Please log in to access the system
+                            </p>
+                            <a href="{% url 'login' %}" class="btn btn-primary btn-lg">
+                                <i class="fas fa-sign-in-alt"></i> Login
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endblock %}
+        </div>
+        {% endif %}
+    {% endblock %}
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- Global JavaScript -->
+    <script>
+        // Global helper functions
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function showGlobalLoading(show = true) {
+            const overlay = document.getElementById('globalLoading');
+            if (overlay) {
+                overlay.style.display = show ? 'flex' : 'none';
+            }
+        }
+
+        function showNotification(message, type = 'info', duration = 5000) {
+            const alertClass = type === 'error' ? 'danger' : type;
+            const icon = type === 'success' ? 'fa-check-circle' : 
+                         type === 'warning' ? 'fa-exclamation-triangle' :
+                         type === 'error' ? 'fa-times-circle' : 'fa-info-circle';
+            
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${alertClass} alert-dismissible fade show notification-toast`;
+            alert.innerHTML = `
+                <i class="fas ${icon} me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.parentNode.removeChild(alert);
+                }
+            }, duration);
+        }
+
+        // Auto-dismiss alerts after 5 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                const alerts = document.querySelectorAll('.alert');
+                alerts.forEach(function(alert) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                });
+            }, 5000);
+        });
+
+        // Enable all tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        // Sidebar collapse for mobile
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.classList.toggle('collapse');
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl + N for new purchase order
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                const newOrderBtn = document.querySelector('a[href*="purchase_order_create"]');
+                if (newOrderBtn) {
+                    window.location.href = newOrderBtn.href;
+                }
+            }
+            
+            // Ctrl + P for print
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+            
+            // Ctrl + R for sale return
+            if (e.ctrlKey && e.key === 'r') {
+                e.preventDefault();
+                const saleReturnBtn = document.querySelector('a[href*="sale_return_create"]');
+                if (saleReturnBtn) {
+                    window.location.href = saleReturnBtn.href;
+                }
+            }
+            
+            // Ctrl + D for due report
+            if (e.ctrlKey && e.key === 'd') {
+                e.preventDefault();
+                const dueReportBtn = document.querySelector('a[href*="customer_due_report"]');
+                if (dueReportBtn) {
+                    window.location.href = dueReportBtn.href;
+                }
+            }
+            
+            // Ctrl + C for collection report
+            if (e.ctrlKey && e.key === 'c') {
+                e.preventDefault();
+                const collectionBtn = document.querySelector('a[href*="due_collection_report"]');
+                if (collectionBtn) {
+                    window.location.href = collectionBtn.href;
+                }
+            }
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

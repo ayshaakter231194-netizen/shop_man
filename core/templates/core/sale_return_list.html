@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Sale Returns{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Sale Returns</h3>
+                <div class="card-tools">
+                    <a href="{% url 'sale_return_create' %}" class="btn btn-primary">Create Return</a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <strong>Total Returns:</strong> {{ total_returns }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Pending:</strong> {{ pending_returns }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Completed:</strong> {{ completed_returns }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Total Refund:</strong> ৳{{ total_refund_amount }}
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>Return No.</th>
+                                <th>Invoice No.</th>
+                                <th>Customer</th>
+                                <th>Return Type</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for return in returns %}
+                            <tr>
+                                <td>{{ return.return_number }}</td>
+                                <td>{{ return.sale.invoice_number }}</td>
+                                <td>{{ return.sale.customer_name }}</td>
+                                <td>
+                                    <span class="badge badge-{% if return.return_type == 'money' %}info{% else %}warning{% endif %}">
+                                        {{ return.get_return_type_display }}
+                                    </span>
+                                </td>
+                                <td>৳{{ return.refund_amount }}</td>
+                                <td>
+                                    <span class="badge badge-{% if return.status == 'pending' %}warning{% elif return.status == 'approved' %}info{% elif return.status == 'completed' %}success{% else %}danger{% endif %}">
+                                        {{ return.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>{{ return.return_date|date:"M d, Y" }}</td>
+                                <td>
+                                    <a href="{% url 'sale_return_detail' return.id %}" class="btn btn-sm btn-info">View</a>
+                                    {% if return.status == 'pending' or return.status == 'approved' %}
+                                    <a href="{% url 'process_sale_return' return.id %}" class="btn btn-sm btn-primary">Process</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center">No sale returns found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

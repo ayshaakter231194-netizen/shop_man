@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Dashboard - Shop Management{% endblock %}
+
+{% block inner_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{% url 'pos_sale' %}" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-cash-register"></i> New Sale
+            </a>
+            <a href="{% url 'product_create' %}" class="btn btn-sm btn-outline-success">
+                <i class="fas fa-plus"></i> Add Product
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+
+{% endblock %}

@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Write Off Expired Products - Shop Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-trash-alt"></i> Write Off Expired Products
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'batch_management' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Batch Management
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-exclamation-triangle"></i> Expired Batches
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if expired_batches %}
+                <div class="alert alert-danger">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-exclamation-circle"></i> Important Notice
+                    </h6>
+                    <p class="mb-0">
+                        Writing off expired products will permanently remove them from your inventory and cannot be undone. 
+                        Please ensure you have proper authorization before proceeding.
+                    </p>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Batch Number</th>
+                                <th>Expiry Date</th>
+                                <th>Current Quantity</th>
+                                <th>Stock Value</th>
+                                <th>Days Expired</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for batch in expired_batches %}
+                            <tr class="table-danger">
+                                <td>
+                                    <strong>{{ batch.product.name }}</strong>
+                                    <br><small class="text-muted">{{ batch.product.category.name }}</small>
+                                </td>
+                                <td>{{ batch.batch_number }}</td>
+                                <td>{{ batch.expiry_date|date:"M d, Y" }}</td>
+                                <td>{{ batch.current_quantity }}</td>
+                                <td>৳{% widthratio batch.current_quantity 1 batch.product.cost_price %}</td>
+                                <td>
+                                    <span class="badge bg-danger">
+                                        {{ batch.days_until_expiry|cut:"-" }} days
+                                    </span>
+                                </td>
+                                <td>
+                                    <form method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="batch_id" value="{{ batch.id }}">
+                                        <input type="hidden" name="quantity" value="{{ batch.current_quantity }}">
+                                        <button type="submit" class="btn btn-sm btn-danger" 
+                                                onclick="return confirm('Write off ALL {{ batch.current_quantity }} units of {{ batch.product.name }} (Batch: {{ batch.batch_number }})? This action cannot be undone.')">
+                                            <i class="fas fa-trash-alt"></i> Write Off All
+                                        </button>
+                                    </form>
+                                    
+                                    <!-- Partial write-off form -->
+                                    <button type="button" class="btn btn-sm btn-warning mt-1" 
+                                            data-bs-toggle="modal" data-bs-target="#partialWriteOffModal{{ batch.id }}">
+                                        <i class="fas fa-edit"></i> Partial
+                                    </button>
+
+                                    <!-- Partial Write-off Modal -->
+                                    <div class="modal fade" id="partialWriteOffModal{{ batch.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Partial Write Off</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <form method="post">
+                                                    {% csrf_token %}
+                                                    <div class="modal-body">
+                                                        <input type="hidden" name="batch_id" value="{{ batch.id }}">
+                                                        <div class="mb-3">
+                                                            <label for="quantity{{ batch.id }}" class="form-label">Quantity to Write Off</label>
+                                                            <input type="number" class="form-control" id="quantity{{ batch.id }}" 
+                                                                   name="quantity" min="1" max="{{ batch.current_quantity }}" 
+                                                                   value="{{ batch.current_quantity }}" required>
+                                                            <div class="form-text">Maximum: {{ batch.current_quantity }} units</div>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label for="reason{{ batch.id }}" class="form-label">Reason</label>
+                                                            <input type="text" class="form-control" id="reason{{ batch.id }}" 
+                                                                   name="reason" value="Expired" required>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-danger">Write Off</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-dark">
+                                <td colspan="3"><strong>Total</strong></td>
+                                <td><strong>{{ expired_batches|length }} batches</strong></td>
+                                <td>
+                                    <strong>
+                                        ৳{% with total=0 %}{% for batch in expired_batches %}{% widthratio batch.current_quantity 1 batch.product.cost_price as value %}{% endfor %}{{ total }}{% endwith %}
+                                    </strong>
+                                </td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Bulk Write-off -->
+                <div class="card mt-4 border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-bolt"></i> Bulk Write Off
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <h6 class="alert-heading">Warning: Bulk Action</h6>
+                            <p class="mb-0">
+                                This will write off ALL expired batches shown above. This action cannot be undone.
+                            </p>
+                        </div>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="bulk_action" value="true">
+                            <button type="submit" class="btn btn-danger w-100" 
+                                    onclick="return confirm('Are you absolutely sure you want to write off ALL {{ expired_batches|length }} expired batches? This will remove all expired stock permanently.')">
+                                <i class="fas fa-bolt"></i> Write Off All Expired Batches
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <h5>No Expired Batches Found</h5>
+                    <p class="text-muted">Great! There are currently no expired batches in your inventory.</p>
+                    <a href="{% url 'batch_management' %}" class="btn btn-primary">
+                        <i class="fas fa-boxes"></i> View All Batches
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Statistics -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i> Statistics
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">Expired Stock Summary</h6>
+                    <hr>
+                    <p class="mb-1"><strong>Total Batches:</strong> {{ expired_batches|length }}</p>
+                    <p class="mb-1"><strong>Total Units:</strong> 
+                        {% with total_units=0 %}
+                            {% for batch in expired_batches %}
+                                {% with total_units=total_units|add:batch.current_quantity %}
+                                {% endwith %}
+                            {% endfor %}
+                            {{ total_units }}
+                        {% endwith %}
+                    </p>
+                    <p class="mb-1"><strong>Total Value:</strong> 
+                        ৳{% with total_value=0 %}
+                            {% for batch in expired_batches %}
+                                {% widthratio batch.current_quantity 1 batch.product.cost_price as batch_value %}
+                                {% with total_value=total_value|add:batch_value %}
+                                {% endwith %}
+                            {% endfor %}
+                            {{ total_value }}
+                        {% endwith %}
+                    </p>
+                    <hr>
+                    <small class="text-muted">As of {{ today|date:"M d, Y" }}</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-cogs"></i> Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'expiry_report' %}" class="btn btn-outline-warning">
+                        <i class="fas fa-calendar-times"></i> View Expiry Report
+                    </a>
+                    <a href="{% url 'purchase_return_list' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-undo"></i> Purchase Returns
+                    </a>
+                    <a href="{% url 'stock_adjustment' %}" class="btn btn-outline-info">
+                        <i class="fas fa-adjust"></i> Stock Adjustment
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

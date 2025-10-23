@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Record Payment - BILL-{{ bill.bill_number }}{% endblock %}
+
+{% block inner_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-money-bill-wave"></i> Record Payment
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'supplier_bill_detail' bill.id %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Bill
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Payment Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <strong>Bill:</strong> BILL-{{ bill.bill_number }}<br>
+                    <strong>Supplier:</strong> {{ bill.supplier.name }}<br>
+                    <strong>Due Amount:</strong> ৳{{ bill.due_amount|floatformat:2 }}<br>
+                    <strong>Due Date:</strong> {{ bill.due_date|date:"M d, Y" }}
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-check"></i> Record Payment
+                        </button>
+                        <a href="{% url 'supplier_bill_detail' bill.id %}" class="btn btn-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

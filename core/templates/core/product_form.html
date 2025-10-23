@@ -1,0 +1,1023 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if form.instance.pk %}Edit Product{% else %}Add New Product{% endif %} - Shop Management
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas {% if form.instance.pk %}fa-edit{% else %}fa-plus-circle{% endif %}"></i>
+        {% if form.instance.pk %}Edit Product{% else %}Add New Product{% endif %}
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'product_list' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Products
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Product Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="productForm">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <!-- Product Name -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">
+                                Product Name <span class="text-danger">*</span>
+                            </label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="text-danger small">{{ form.name.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- SKU -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.sku.id_for_label }}" class="form-label">
+                                SKU <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                {{ form.sku }}
+                                <button type="button" class="btn btn-outline-secondary" id="generateSku">
+                                    <i class="fas fa-sync"></i>
+                                </button>
+                            </div>
+                            {% if form.sku.errors %}
+                                <div class="text-danger small">{{ form.sku.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Barcode -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.barcode.id_for_label }}" class="form-label">
+                                Barcode Number
+                            </label>
+                            <div class="input-group">
+                                {{ form.barcode }}
+                                <button type="button" class="btn btn-outline-secondary" id="scanBarcode" title="Click to simulate barcode scan">
+                                    <i class="fas fa-barcode"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="generateBarcode" title="Generate barcode from SKU">
+                                    <i class="fas fa-magic"></i>
+                                </button>
+                            </div>
+                            {% if form.barcode.errors %}
+                                <div class="text-danger small">{{ form.barcode.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">
+                                {{ form.barcode.help_text }}
+                            </div>
+                        </div>
+
+                        <!-- Supplier - Searchable Dropdown -->
+                        <div class="col-md-6 mb-3">
+                            <label for="supplierSearch" class="form-label">
+                                Supplier
+                            </label>
+                            <div class="searchable-dropdown">
+                                <div class="input-group">
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="supplierSearch" 
+                                           placeholder="Search or create new supplier..."
+                                           autocomplete="off"
+                                           value="{% if form.instance.supplier %}{{ form.instance.supplier.name }}{% endif %}">
+                                    <button type="button" class="btn btn-outline-primary" id="addSupplierBtn" data-bs-toggle="modal" data-bs-target="#supplierModal">
+                                        <i class="fas fa-plus"></i> New
+                                    </button>
+                                </div>
+                                <input type="hidden" name="supplier" id="selectedSupplier" value="{% if form.instance.supplier %}{{ form.instance.supplier.id }}{% endif %}">
+                                <div class="dropdown-results" id="supplierResults"></div>
+                                
+                                <!-- Selected supplier display -->
+                                <div id="selectedSupplierDisplay" class="mt-2">
+                                    {% if form.instance.supplier %}
+                                        <span class="badge bg-primary">
+                                            {{ form.instance.supplier.name }}
+                                            <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.7rem;" onclick="clearSupplier()"></button>
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="form-text">
+                                Primary supplier for this product (optional)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Category - Searchable Dropdown -->
+                        <div class="col-md-6 mb-3">
+                            <label for="categorySearch" class="form-label">
+                                Category <span class="text-danger">*</span>
+                            </label>
+                            <div class="searchable-dropdown">
+                                <div class="input-group">
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="categorySearch" 
+                                           placeholder="Search or create new category..."
+                                           autocomplete="off"
+                                           value="{% if form.instance.category %}{{ form.instance.category.name }}{% endif %}">
+                                    <button type="button" class="btn btn-outline-primary" id="addCategoryBtn" data-bs-toggle="modal" data-bs-target="#categoryModal">
+                                        <i class="fas fa-plus"></i> New
+                                    </button>
+                                </div>
+                                <input type="hidden" name="category" id="selectedCategory" value="{% if form.instance.category %}{{ form.instance.category.id }}{% endif %}" required>
+                                <div class="dropdown-results" id="categoryResults"></div>
+                                
+                                <!-- Selected category display -->
+                                <div id="selectedCategoryDisplay" class="mt-2">
+                                    {% if form.instance.category %}
+                                        <span class="badge bg-success">
+                                            {{ form.instance.category.name }}
+                                            <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.7rem;" onclick="clearCategory()"></button>
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div id="categoryError" class="text-danger small" style="display: none;"></div>
+                        </div>
+
+                        <!-- Current Stock -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.current_stock.id_for_label }}" class="form-label">
+                                Current Stock
+                            </label>
+                            {{ form.current_stock }}
+                            {% if form.current_stock.errors %}
+                                <div class="text-danger small">{{ form.current_stock.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Expiry Settings -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-calendar-alt"></i> Expiry Settings
+                                    </h6>
+                                    <div class="row">
+                                        <!-- Has Expiry -->
+                                        <div class="col-md-6 mb-3">
+                                            <div class="form-check form-switch">
+                                                {{ form.has_expiry }}
+                                                <label class="form-check-label" for="{{ form.has_expiry.id_for_label }}">
+                                                    <strong>This product has expiry date</strong>
+                                                </label>
+                                            </div>
+                                            <div class="form-text">
+                                                Enable if this product expires and needs batch tracking
+                                            </div>
+                                        </div>
+
+                                        <!-- Expiry Warning Days -->
+                                        <div class="col-md-6 mb-3" id="expiryWarningField">
+                                            <label for="{{ form.expiry_warning_days.id_for_label }}" class="form-label">
+                                                Expiry Warning (Days)
+                                            </label>
+                                            <div class="input-group">
+                                                {{ form.expiry_warning_days }}
+                                                <span class="input-group-text">days</span>
+                                            </div>
+                                            {% if form.expiry_warning_days.errors %}
+                                                <div class="text-danger small">{{ form.expiry_warning_days.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text">
+                                                Alert when product is this many days from expiry
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Cost Price -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.cost_price.id_for_label }}" class="form-label">
+                                Cost Price <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">৳</span>
+                                {{ form.cost_price }}
+                            </div>
+                            {% if form.cost_price.errors %}
+                                <div class="text-danger small">{{ form.cost_price.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Selling Price -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.selling_price.id_for_label }}" class="form-label">
+                                Selling Price <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">৳</span>
+                                {{ form.selling_price }}
+                            </div>
+                            {% if form.selling_price.errors %}
+                                <div class="text-danger small">{{ form.selling_price.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">
+                                Profit Margin: <span id="profitMargin">0.00%</span> | 
+                                Profit: ৳<span id="profitAmount">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Minimum Stock Level -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.min_stock_level.id_for_label }}" class="form-label">
+                                Minimum Stock Level
+                            </label>
+                            {{ form.min_stock_level }}
+                            {% if form.min_stock_level.errors %}
+                                <div class="text-danger small">{{ form.min_stock_level.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">
+                                Low stock alert will trigger when stock reaches this level
+                            </div>
+                        </div>
+
+                        <!-- Stock Status Display -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Stock Status</label>
+                            <div>
+                                {% if form.instance.pk %}
+                                    {% if form.instance.current_stock == 0 %}
+                                        <span class="badge bg-danger fs-6">Out of Stock</span>
+                                    {% elif form.instance.current_stock <= form.instance.min_stock_level %}
+                                        <span class="badge bg-warning fs-6">Low Stock</span>
+                                    {% else %}
+                                        <span class="badge bg-success fs-6">In Stock</span>
+                                    {% endif %}
+                                    
+                                    <!-- Expiry Status -->
+                                    {% if form.instance.has_expiry %}
+                                        <div class="mt-2">
+                                            {% if form.instance.expired_stock > 0 %}
+                                                <span class="badge bg-danger fs-6">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                    {{ form.instance.expired_stock }} Expired
+                                                </span>
+                                            {% endif %}
+                                            {% if form.instance.near_expiry_stock > 0 %}
+                                                <span class="badge bg-warning fs-6">
+                                                    <i class="fas fa-clock"></i>
+                                                    {{ form.instance.near_expiry_stock }} Near Expiry
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary fs-6">New Product</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">
+                            Description
+                        </label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="text-danger small">{{ form.description.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">
+                            Character count: <span id="charCount">0</span>/500
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-save"></i>
+                                {% if form.instance.pk %}Update Product{% else %}Create Product{% endif %}
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="{% url 'product_list' %}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar with Help and Quick Actions -->
+    <div class="col-md-4">
+        <!-- Quick Stats Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-line"></i> Pricing Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Cost Price</small>
+                            <strong id="displayCostPrice">৳0.00</strong>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Selling Price</small>
+                            <strong id="displaySellingPrice">৳0.00</strong>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="bg-light rounded p-2">
+                            <small class="text-muted d-block">Profit Margin</small>
+                            <strong id="displayProfitMargin" class="text-success">0.00%</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barcode Information Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-barcode"></i> Barcode Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-info-circle"></i> Barcode Usage
+                    </h6>
+                    <small>
+                        Barcodes help with:
+                        <ul class="mb-0 mt-2">
+                            <li>Quick product lookup during sales</li>
+                            <li>Inventory management</li>
+                            <li>Stock counting</li>
+                            <li>Product identification</li>
+                        </ul>
+                    </small>
+                </div>
+                
+                {% if form.instance.pk and form.instance.barcode %}
+                <div class="alert alert-success">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-check-circle"></i> Current Barcode
+                    </h6>
+                    <small>
+                        <strong>Barcode:</strong> {{ form.instance.barcode }}<br>
+                        <strong>Scan Ready:</strong> Yes
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Expiry Information Card -->
+        <div class="card mb-4" id="expiryInfoCard">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-calendar-check"></i> Expiry Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-info-circle"></i> Expiry Tracking
+                    </h6>
+                    <small>
+                        When enabled, this product will:
+                        <ul class="mb-0 mt-2">
+                            <li>Track stock by batches</li>
+                            <li>Require expiry dates on purchase</li>
+                            <li>Show expiry alerts</li>
+                            <li>Support expiry-based returns</li>
+                        </ul>
+                    </small>
+                </div>
+                
+                {% if form.instance.pk and form.instance.has_expiry %}
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-exclamation-triangle"></i> Current Status
+                    </h6>
+                    <small>
+                        <strong>Near Expiry:</strong> {{ form.instance.near_expiry_stock }} units<br>
+                        <strong>Expired:</strong> {{ form.instance.expired_stock }} units<br>
+                        <strong>Warning Days:</strong> {{ form.instance.expiry_warning_days }} days
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Help Card -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-question-circle"></i> Quick Tips
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-lightbulb"></i> Best Practices
+                    </h6>
+                    <ul class="mb-0 ps-3">
+                        <li>Set realistic minimum stock levels</li>
+                        <li>Enable expiry tracking for perishable items</li>
+                        <li>Set appropriate expiry warning periods</li>
+                        <li>Ensure selling price covers cost + overhead</li>
+                        <li>Use unique SKU for each product</li>
+                        <li>Keep descriptions clear and concise</li>
+                        <li>Use barcodes for efficient inventory management</li>
+                        <li>Assign suppliers for better purchase planning</li>
+                    </ul>
+                </div>
+                
+                {% if form.instance.pk %}
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-exclamation-triangle"></i> Product Details
+                    </h6>
+                    <small>
+                        <strong>Created:</strong> {{ form.instance.created_at|date:"M d, Y" }}<br>
+                        <strong>Last Updated:</strong> {{ form.instance.updated_at|date:"M d, Y H:i" }}<br>
+                        <strong>Current Stock:</strong> {{ form.instance.current_stock }}<br>
+                        {% if form.instance.supplier %}
+                        <strong>Supplier:</strong> {{ form.instance.supplier.name }}<br>
+                        {% endif %}
+                        {% if form.instance.barcode %}
+                        <strong>Barcode:</strong> {{ form.instance.barcode }}<br>
+                        {% endif %}
+                        {% if form.instance.has_expiry %}
+                        <strong>Expiry Tracking:</strong> Enabled<br>
+                        <strong>Warning Period:</strong> {{ form.instance.expiry_warning_days }} days
+                        {% else %}
+                        <strong>Expiry Tracking:</strong> Disabled
+                        {% endif %}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Category Modal -->
+<div class="modal fade" id="categoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="categoryForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="newCategoryName" class="form-label">Category Name *</label>
+                        <input type="text" class="form-control" id="newCategoryName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newCategoryDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="newCategoryDescription" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveCategoryBtn">Save Category</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Supplier Modal -->
+<div class="modal fade" id="supplierModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Supplier</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="supplierForm">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="newSupplierName" class="form-label">Supplier Name *</label>
+                        <input type="text" class="form-control" id="newSupplierName" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="newSupplierContact" class="form-label">Contact Person</label>
+                        <input type="text" class="form-control" id="newSupplierContact">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="newSupplierEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="newSupplierEmail">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="newSupplierPhone" class="form-label">Phone</label>
+                        <input type="text" class="form-control" id="newSupplierPhone">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="newSupplierAddress" class="form-label">Address</label>
+                    <textarea class="form-control" id="newSupplierAddress" rows="3"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="saveSupplierBtn">Save Supplier</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global variables
+let categoryResults = [];
+let supplierResults = [];
+let selectedCategoryIndex = -1;
+let selectedSupplierIndex = -1;
+
+// Initialize when document is ready
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSearchableDropdowns();
+    initializeFormValidation();
+    // Your existing initialization code...
+});
+
+function initializeSearchableDropdowns() {
+    // Category search functionality
+    const categorySearch = document.getElementById('categorySearch');
+    const categoryResultsDiv = document.getElementById('categoryResults');
+    
+    // Supplier search functionality
+    const supplierSearch = document.getElementById('supplierSearch');
+    const supplierResultsDiv = document.getElementById('supplierResults');
+    
+    // Category event listeners
+    categorySearch.addEventListener('input', function() {
+        const searchTerm = this.value.trim();
+        if (searchTerm.length >= 2) {
+            searchCategories(searchTerm);
+        } else {
+            hideResults(categoryResultsDiv);
+        }
+    });
+    
+    categorySearch.addEventListener('keydown', function(e) {
+        handleSearchKeydown(e, categoryResults, selectedCategoryIndex, categoryResultsDiv, selectCategory);
+    });
+    
+    categorySearch.addEventListener('focus', function() {
+        if (this.value.trim().length >= 2) {
+            searchCategories(this.value.trim());
+        }
+    });
+    
+    // Supplier event listeners
+    supplierSearch.addEventListener('input', function() {
+        const searchTerm = this.value.trim();
+        if (searchTerm.length >= 2) {
+            searchSuppliers(searchTerm);
+        } else {
+            hideResults(supplierResultsDiv);
+        }
+    });
+    
+    supplierSearch.addEventListener('keydown', function(e) {
+        handleSearchKeydown(e, supplierResults, selectedSupplierIndex, supplierResultsDiv, selectSupplier);
+    });
+    
+    supplierSearch.addEventListener('focus', function() {
+        if (this.value.trim().length >= 2) {
+            searchSuppliers(this.value.trim());
+        }
+    });
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.searchable-dropdown')) {
+            hideResults(categoryResultsDiv);
+            hideResults(supplierResultsDiv);
+        }
+    });
+    
+    // Pre-populate for edit mode
+    {% if form.instance.pk %}
+        {% if form.instance.category %}
+            selectCategory({{ form.instance.category.id }}, '{{ form.instance.category.name|escapejs }}');
+        {% endif %}
+        {% if form.instance.supplier %}
+            selectSupplier({{ form.instance.supplier.id }}, '{{ form.instance.supplier.name|escapejs }}');
+        {% endif %}
+    {% endif %}
+}
+
+function initializeFormValidation() {
+    // Form validation
+    document.getElementById('productForm').addEventListener('submit', function(e) {
+        const categoryId = document.getElementById('selectedCategory').value;
+        const categoryError = document.getElementById('categoryError');
+        
+        if (!categoryId) {
+            e.preventDefault();
+            categoryError.textContent = 'Please select a category';
+            categoryError.style.display = 'block';
+            document.getElementById('categorySearch').focus();
+            return false;
+        } else {
+            categoryError.style.display = 'none';
+        }
+        
+        // Your existing validation code...
+        const costPrice = parseFloat(document.getElementById('{{ form.cost_price.id_for_label }}').value) || 0;
+        const sellingPrice = parseFloat(document.getElementById('{{ form.selling_price.id_for_label }}').value) || 0;
+        
+        if (sellingPrice < costPrice) {
+            e.preventDefault();
+            alert('Warning: Selling price is less than cost price! This will result in a loss.');
+        }
+        
+        const currentStock = parseInt(document.getElementById('{{ form.current_stock.id_for_label }}').value) || 0;
+        const minStock = parseInt(document.getElementById('{{ form.min_stock_level.id_for_label }}').value) || 0;
+        
+        if (currentStock < minStock) {
+            if (!confirm('Current stock is below minimum stock level. Do you want to continue?')) {
+                e.preventDefault();
+            }
+        }
+
+        // Validate expiry warning days if expiry is enabled
+        const hasExpiry = document.getElementById('{{ form.has_expiry.id_for_label }}').checked;
+        if (hasExpiry) {
+            const warningDays = parseInt(document.getElementById('{{ form.expiry_warning_days.id_for_label }}').value) || 0;
+            if (warningDays < 1) {
+                e.preventDefault();
+                alert('Please set a valid expiry warning period (minimum 1 day).');
+            }
+        }
+
+        // Validate barcode uniqueness (basic client-side check)
+        const barcode = document.getElementById('{{ form.barcode.id_for_label }}').value;
+        if (barcode && barcode.length < 3) {
+            e.preventDefault();
+            alert('Barcode must be at least 3 characters long.');
+        }
+    });
+}
+
+// Search functions
+function searchCategories(searchTerm) {
+    fetch(`/api/categories/search/?q=${encodeURIComponent(searchTerm)}`)
+        .then(response => response.json())
+        .then(data => {
+            categoryResults = data;
+            displayCategoryResults(data);
+        })
+        .catch(error => {
+            console.error('Error searching categories:', error);
+        });
+}
+
+function searchSuppliers(searchTerm) {
+    fetch(`/api/suppliers/search/?q=${encodeURIComponent(searchTerm)}`)
+        .then(response => response.json())
+        .then(data => {
+            supplierResults = data;
+            displaySupplierResults(data);
+        })
+        .catch(error => {
+            console.error('Error searching suppliers:', error);
+        });
+}
+
+// Display results functions
+function displayCategoryResults(categories) {
+    const resultsDiv = document.getElementById('categoryResults');
+    if (categories.length === 0) {
+        resultsDiv.innerHTML = '<div class="dropdown-item text-muted">No categories found</div>';
+        showResults(resultsDiv);
+        return;
+    }
+    
+    let html = '';
+    categories.forEach((category, index) => {
+        html += `
+            <div class="dropdown-item ${index === selectedCategoryIndex ? 'active' : ''}" 
+                 data-id="${category.id}" 
+                 data-name="${category.name}"
+                 onclick="selectCategory(${category.id}, '${category.name.replace(/'/g, "\\'")}')">
+                <strong>${category.name}</strong>
+                ${category.description ? `<br><small class="text-muted">${category.description}</small>` : ''}
+            </div>
+        `;
+    });
+    
+    resultsDiv.innerHTML = html;
+    showResults(resultsDiv);
+}
+
+function displaySupplierResults(suppliers) {
+    const resultsDiv = document.getElementById('supplierResults');
+    if (suppliers.length === 0) {
+        resultsDiv.innerHTML = '<div class="dropdown-item text-muted">No suppliers found</div>';
+        showResults(resultsDiv);
+        return;
+    }
+    
+    let html = '';
+    suppliers.forEach((supplier, index) => {
+        html += `
+            <div class="dropdown-item ${index === selectedSupplierIndex ? 'active' : ''}" 
+                 data-id="${supplier.id}" 
+                 data-name="${supplier.name}"
+                 onclick="selectSupplier(${supplier.id}, '${supplier.name.replace(/'/g, "\\'")}')">
+                <strong>${supplier.name}</strong>
+                ${supplier.contact_person ? `<br><small class="text-muted">Contact: ${supplier.contact_person}</small>` : ''}
+                ${supplier.phone ? `<br><small class="text-muted">Phone: ${supplier.phone}</small>` : ''}
+            </div>
+        `;
+    });
+    
+    resultsDiv.innerHTML = html;
+    showResults(resultsDiv);
+}
+
+// Selection functions
+function selectCategory(id, name) {
+    document.getElementById('selectedCategory').value = id;
+    document.getElementById('categorySearch').value = name;
+    document.getElementById('selectedCategoryDisplay').innerHTML = `
+        <span class="badge bg-success">
+            ${name}
+            <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.7rem;" onclick="clearCategory()"></button>
+        </span>
+    `;
+    hideResults(document.getElementById('categoryResults'));
+    selectedCategoryIndex = -1;
+    document.getElementById('categoryError').style.display = 'none';
+}
+
+function selectSupplier(id, name) {
+    document.getElementById('selectedSupplier').value = id;
+    document.getElementById('supplierSearch').value = name;
+    document.getElementById('selectedSupplierDisplay').innerHTML = `
+        <span class="badge bg-primary">
+            ${name}
+            <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.7rem;" onclick="clearSupplier()"></button>
+        </span>
+    `;
+    hideResults(document.getElementById('supplierResults'));
+    selectedSupplierIndex = -1;
+}
+
+// Clear functions
+function clearCategory() {
+    document.getElementById('selectedCategory').value = '';
+    document.getElementById('categorySearch').value = '';
+    document.getElementById('selectedCategoryDisplay').innerHTML = '';
+}
+
+function clearSupplier() {
+    document.getElementById('selectedSupplier').value = '';
+    document.getElementById('supplierSearch').value = '';
+    document.getElementById('selectedSupplierDisplay').innerHTML = '';
+}
+
+// Keyboard navigation
+function handleSearchKeydown(e, results, selectedIndex, resultsDiv, selectFunction) {
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedIndex = (selectedIndex + 1) % results.length;
+        updateSelectedItem(resultsDiv, selectedIndex);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedIndex = (selectedIndex - 1 + results.length) % results.length;
+        updateSelectedItem(resultsDiv, selectedIndex);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedIndex >= 0 && selectedIndex < results.length) {
+            const item = results[selectedIndex];
+            selectFunction(item.id, item.name);
+        }
+    } else if (e.key === 'Escape') {
+        hideResults(resultsDiv);
+    }
+}
+
+function updateSelectedItem(resultsDiv, selectedIndex) {
+    const items = resultsDiv.querySelectorAll('.dropdown-item');
+    items.forEach((item, index) => {
+        item.classList.toggle('active', index === selectedIndex);
+    });
+    
+    if (resultsDiv.id === 'categoryResults') {
+        selectedCategoryIndex = selectedIndex;
+    } else {
+        selectedSupplierIndex = selectedIndex;
+    }
+}
+
+// Show/hide results
+function showResults(resultsDiv) {
+    resultsDiv.style.display = 'block';
+}
+
+function hideResults(resultsDiv) {
+    resultsDiv.style.display = 'none';
+}
+
+// Modal save functions
+document.getElementById('saveCategoryBtn').addEventListener('click', function() {
+    const name = document.getElementById('newCategoryName').value.trim();
+    const description = document.getElementById('newCategoryDescription').value.trim();
+    
+    if (!name) {
+        alert('Please enter a category name');
+        return;
+    }
+    
+    fetch('/api/categories/create/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            name: name,
+            description: description
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            selectCategory(data.category.id, data.category.name);
+            $('#categoryModal').modal('hide');
+            document.getElementById('categoryForm').reset();
+            showToast('Category created successfully!', 'success');
+        } else {
+            alert('Error creating category: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error creating category:', error);
+        alert('Error creating category');
+    });
+});
+
+document.getElementById('saveSupplierBtn').addEventListener('click', function() {
+    const name = document.getElementById('newSupplierName').value.trim();
+    const contact_person = document.getElementById('newSupplierContact').value.trim();
+    const email = document.getElementById('newSupplierEmail').value.trim();
+    const phone = document.getElementById('newSupplierPhone').value.trim();
+    const address = document.getElementById('newSupplierAddress').value.trim();
+    
+    if (!name) {
+        alert('Please enter a supplier name');
+        return;
+    }
+    
+    fetch('/api/suppliers/create/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            name: name,
+            contact_person: contact_person,
+            email: email,
+            phone: phone,
+            address: address
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            selectSupplier(data.supplier.id, data.supplier.name);
+            $('#supplierModal').modal('hide');
+            document.getElementById('supplierForm').reset();
+            showToast('Supplier created successfully!', 'success');
+        } else {
+            alert('Error creating supplier: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error creating supplier:', error);
+        alert('Error creating supplier');
+    });
+});
+
+// Utility function to get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Your existing JavaScript functions (calculateProfit, updateDisplayPrices, etc.) remain the same
+// ... (keep all your existing JavaScript code)
+
+</script>
+
+<style>
+.searchable-dropdown {
+    position: relative;
+}
+
+.dropdown-results {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.dropdown-item {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.dropdown-item:hover,
+.dropdown-item.active {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+/* Your existing styles remain the same */
+.form-label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+    border-radius: 0.375rem;
+    border: 1px solid #dee2e6;
+    padding: 0.5rem 0.75rem;
+}
+
+/* ... rest of your existing styles */
+</style>
+{% endblock %}

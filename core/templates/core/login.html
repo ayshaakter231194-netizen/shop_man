@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Shop Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+            animation: slideUp 0.6s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .login-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .login-body {
+            padding: 2rem;
+        }
+        
+        .brand-logo {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        
+        .form-control {
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        .form-control:focus {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+            background: white;
+        }
+        
+        .btn-login {
+            background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+            border: none;
+            border-radius: 10px;
+            padding: 0.75rem 2rem;
+            font-weight: 600;
+            color: white;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        .input-group-text {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-right: none;
+            border-radius: 10px 0 0 10px;
+        }
+        
+        .password-toggle {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-left: none;
+            border-radius: 0 10px 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .password-toggle:hover {
+            background: #e9ecef;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            color: #6c757d;
+        }
+        
+        .feature-list li i {
+            color: var(--success-color);
+            margin-right: 0.5rem;
+        }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .security-badge {
+            background: rgba(39, 174, 96, 0.1);
+            border: 1px solid var(--success-color);
+            color: var(--success-color);
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .language-selector {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+        }
+        
+        .demo-accounts {
+            background: rgba(52, 152, 219, 0.1);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .demo-account {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .demo-account:hover {
+            border-color: var(--secondary-color);
+            transform: translateX(5px);
+        }
+        
+        .demo-account:last-child {
+            margin-bottom: 0;
+        }
+        
+        .footer-links {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .footer-links a {
+            color: #6c757d;
+            text-decoration: none;
+            margin: 0 0.5rem;
+            transition: color 0.3s ease;
+        }
+        
+        .footer-links a:hover {
+            color: var(--secondary-color);
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .login-container {
+                margin: 1rem;
+            }
+            
+            .login-header, .login-body {
+                padding: 1.5rem;
+            }
+            
+            .brand-logo {
+                font-size: 2rem;
+            }
+        }
+        
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .login-container {
+                background: rgba(45, 45, 45, 0.95);
+                color: white;
+            }
+            
+            .form-control {
+                background: #2d2d2d;
+                border-color: #444;
+                color: white;
+            }
+            
+            .form-control:focus {
+                background: #333;
+                color: white;
+            }
+            
+            .input-group-text, .password-toggle {
+                background: #2d2d2d;
+                border-color: #444;
+                color: white;
+            }
+        }
+        
+        /* Loading animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Password strength indicator */
+        .password-strength {
+            height: 4px;
+            border-radius: 2px;
+            margin-top: 0.25rem;
+            transition: all 0.3s ease;
+        }
+        
+        .strength-weak { background: #e74c3c; width: 25%; }
+        .strength-fair { background: #f39c12; width: 50%; }
+        .strength-good { background: #3498db; width: 75%; }
+        .strength-strong { background: #27ae60; width: 100%; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-10 col-lg-8">
+                <div class="login-container">
+                    <!-- Language Selector -->
+                    <div class="language-selector">
+                        <select class="form-select form-select-sm" style="width: auto;">
+                            <option value="en">English</option>
+                            <option value="es">Español</option>
+                            <option value="fr">Français</option>
+                            <option value="hi">हिन्दी</option>
+                        </select>
+                    </div>
+
+                    <div class="row g-0">
+                        <!-- Login Form Section -->
+                        <div class="col-lg-6">
+                            <div class="login-body">
+                                <div class="text-center mb-4">
+                                    <i class="fas fa-store brand-logo text-primary"></i>
+                                    <h2 class="h3 mb-2">Welcome Back</h2>
+                                    <p class="text-muted">Sign in to your account</p>
+                                </div>
+
+                                {% if form.errors %}
+                                <div class="alert alert-danger">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Your username and password didn't match. Please try again.
+                                </div>
+                                {% endif %}
+
+                                {% if next %}
+                                    {% if user.is_authenticated %}
+                                    <div class="alert alert-warning">
+                                        <i class="fas fa-exclamation-circle me-2"></i>
+                                        Your account doesn't have access to this page. To proceed, please login with an account that has access.
+                                    </div>
+                                    {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        Please login to see this page.
+                                    </div>
+                                    {% endif %}
+                                {% endif %}
+
+                                <form method="post" action="{% url 'login' %}" id="loginForm">
+                                    {% csrf_token %}
+                                    
+                                    <input type="hidden" name="next" value="{{ next }}">
+
+                                    <div class="mb-3">
+                                        <label for="id_username" class="form-label">
+                                            <i class="fas fa-user me-1"></i>Username or Email
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">
+                                                <i class="fas fa-user"></i>
+                                            </span>
+                                            <input type="text" name="username" class="form-control" id="id_username" 
+                                                   placeholder="Enter your username or email" required autofocus
+                                                   value="{% if form.username.value %}{{ form.username.value }}{% endif %}">
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="id_password" class="form-label">
+                                            <i class="fas fa-lock me-1"></i>Password
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">
+                                                <i class="fas fa-lock"></i>
+                                            </span>
+                                            <input type="password" name="password" class="form-control" id="id_password" 
+                                                   placeholder="Enter your password" required>
+                                            <span class="input-group-text password-toggle" onclick="togglePassword()">
+                                                <i class="fas fa-eye" id="passwordToggleIcon"></i>
+                                            </span>
+                                        </div>
+                                        <div class="password-strength strength-weak" id="passwordStrength" style="display: none;"></div>
+                                    </div>
+
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="rememberMe" name="remember_me">
+                                        <label class="form-check-label" for="rememberMe">
+                                            Remember me on this device
+                                        </label>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-login mb-3" id="loginButton">
+                                        <span id="loginText">Sign In</span>
+                                        <span id="loginLoading" class="loading" style="display: none;"></span>
+                                    </button>
+
+                                    <div class="text-center">
+                                        <a href="#" class="text-decoration-none" onclick="showForgotPassword()">
+                                            <i class="fas fa-key me-1"></i>Forgot your password?
+                                        </a>
+                                    </div>
+
+                                    <!-- Demo Accounts (for development) -->
+                                    {% if debug %}
+                                    <div class="demo-accounts">
+                                        <h6 class="mb-2"><i class="fas fa-flask me-1"></i>Demo Accounts</h6>
+                                        <div class="demo-account" onclick="fillDemoCredentials('admin', 'admin123')">
+                                            <small><strong>Admin</strong> - admin / admin123</small>
+                                        </div>
+                                        <div class="demo-account" onclick="fillDemoCredentials('manager', 'manager123')">
+                                            <small><strong>Manager</strong> - manager / manager123</small>
+                                        </div>
+                                        <div class="demo-account" onclick="fillDemoCredentials('sales', 'sales123')">
+                                            <small><strong>Sales</strong> - sales / sales123</small>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </form>
+
+                                <div class="footer-links">
+                                    <small>
+                                        <a href="#" onclick="showPrivacyPolicy()">Privacy Policy</a> • 
+                                        <a href="#" onclick="showTerms()">Terms of Service</a> • 
+                                        <span class="security-badge">
+                                            <i class="fas fa-shield-alt"></i>Secure Login
+                                        </span>
+                                    </small>
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            &copy; 2024 Shop Management System. All rights reserved.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Features Section -->
+                        <div class="col-lg-6 d-none d-lg-block">
+                            <div class="login-header h-100 d-flex align-items-center justify-content-center">
+                                <div class="text-center">
+                                    <i class="fas fa-chart-line display-1 mb-4 opacity-75"></i>
+                                    <h3 class="mb-3">Shop Management System</h3>
+                                    <p class="mb-4 opacity-90">Complete solution for your retail business</p>
+                                    
+                                    <ul class="feature-list text-start">
+                                        <li><i class="fas fa-check-circle"></i> Point of Sale (POS) System</li>
+                                        <li><i class="fas fa-check-circle"></i> Inventory Management</li>
+                                        <li><i class="fas fa-check-circle"></i> Sales Analytics & Reports</li>
+                                        <li><i class="fas fa-check-circle"></i> Purchase Order Management</li>
+                                        <li><i class="fas fa-check-circle"></i> Customer Management</li>
+                                        <li><i class="fas fa-check-circle"></i> Multi-user Access Control</li>
+                                    </ul>
+                                    
+                                    <div class="mt-4">
+                                        <div class="row text-center">
+                                            <div class="col-4">
+                                                <h4 class="mb-0">100%</h4>
+                                                <small>Uptime</small>
+                                            </div>
+                                            <div class="col-4">
+                                                <h4 class="mb-0">256-bit</h4>
+                                                <small>Encryption</small>
+                                            </div>
+                                            <div class="col-4">
+                                                <h4 class="mb-0">24/7</h4>
+                                                <small>Support</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div class="modal fade" id="forgotPasswordModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-key me-2"></i>Reset Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Enter your email address and we'll send you a link to reset your password.</p>
+                    <div class="mb-3">
+                        <label for="resetEmail" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="resetEmail" placeholder="your@email.com">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="sendResetLink()">Send Reset Link</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Toggle password visibility
+        function togglePassword() {
+            const passwordInput = document.getElementById('id_password');
+            const toggleIcon = document.getElementById('passwordToggleIcon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.className = 'fas fa-eye-slash';
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.className = 'fas fa-eye';
+            }
+        }
+
+        // Show forgot password modal
+        function showForgotPassword() {
+            const modal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
+            modal.show();
+        }
+
+        // Send password reset link
+        function sendResetLink() {
+            const email = document.getElementById('resetEmail').value;
+            if (!email) {
+                alert('Please enter your email address.');
+                return;
+            }
+            
+            // Simulate API call
+            const loginButton = document.getElementById('loginButton');
+            const loginText = document.getElementById('loginText');
+            const loginLoading = document.getElementById('loginLoading');
+            
+            loginText.style.display = 'none';
+            loginLoading.style.display = 'inline-block';
+            loginButton.disabled = true;
+            
+            setTimeout(() => {
+                loginText.style.display = 'inline-block';
+                loginLoading.style.display = 'none';
+                loginButton.disabled = false;
+                
+                bootstrap.Modal.getInstance(document.getElementById('forgotPasswordModal')).hide();
+                showNotification('Password reset link sent to your email!', 'success');
+            }, 2000);
+        }
+
+        // Fill demo credentials (for development)
+        function fillDemoCredentials(username, password) {
+            document.getElementById('id_username').value = username;
+            document.getElementById('id_password').value = password;
+            showNotification(`Demo credentials filled: ${username}`, 'info');
+        }
+
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+            alert.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.parentNode.removeChild(alert);
+                }
+            }, 5000);
+        }
+
+        // Password strength indicator
+        function checkPasswordStrength(password) {
+            const strengthBar = document.getElementById('passwordStrength');
+            
+            if (!password) {
+                strengthBar.style.display = 'none';
+                return;
+            }
+            
+            let strength = 0;
+            if (password.length >= 8) strength++;
+            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+            if (password.match(/\d/)) strength++;
+            if (password.match(/[^a-zA-Z\d]/)) strength++;
+            
+            strengthBar.style.display = 'block';
+            strengthBar.className = 'password-strength';
+            
+            switch(strength) {
+                case 0:
+                case 1:
+                    strengthBar.classList.add('strength-weak');
+                    break;
+                case 2:
+                    strengthBar.classList.add('strength-fair');
+                    break;
+                case 3:
+                    strengthBar.classList.add('strength-good');
+                    break;
+                case 4:
+                    strengthBar.classList.add('strength-strong');
+                    break;
+            }
+        }
+
+        // Form submission handler
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            const loginButton = document.getElementById('loginButton');
+            const loginText = document.getElementById('loginText');
+            const loginLoading = document.getElementById('loginLoading');
+            
+            loginText.style.display = 'none';
+            loginLoading.style.display = 'inline-block';
+            loginButton.disabled = true;
+            
+            // Form will submit normally, this just shows loading state
+        });
+
+        // Show privacy policy
+        function showPrivacyPolicy() {
+            alert('Privacy policy would be displayed here.');
+        }
+
+        // Show terms of service
+        function showTerms() {
+            alert('Terms of service would be displayed here.');
+        }
+
+        // Initialize event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Password strength checking
+            document.getElementById('id_password').addEventListener('input', function() {
+                checkPasswordStrength(this.value);
+            });
+            
+            // Auto-focus username field
+            document.getElementById('id_username').focus();
+            
+            // Add keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                // Ctrl+Enter to submit form
+                if (e.ctrlKey && e.key === 'Enter') {
+                    document.getElementById('loginForm').submit();
+                }
+                // Escape to clear form
+                if (e.key === 'Escape') {
+                    document.getElementById('loginForm').reset();
+                    document.getElementById('id_username').focus();
+                }
+            });
+            
+            // Check for saved credentials
+            const savedUsername = localStorage.getItem('rememberedUsername');
+            if (savedUsername && document.getElementById('rememberMe')) {
+                document.getElementById('id_username').value = savedUsername;
+                document.getElementById('rememberMe').checked = true;
+            }
+            
+            // Save credentials if remember me is checked
+            const rememberMe = document.getElementById('rememberMe');
+            if (rememberMe) {
+                rememberMe.addEventListener('change', function() {
+                    if (this.checked) {
+                        localStorage.setItem('rememberMe', 'true');
+                    } else {
+                        localStorage.removeItem('rememberMe');
+                        localStorage.removeItem('rememberedUsername');
+                    }
+                });
+            }
+        });
+
+        // Save username when typing if remember me is checked
+        document.getElementById('id_username').addEventListener('input', function() {
+            if (document.getElementById('rememberMe')?.checked) {
+                localStorage.setItem('rememberedUsername', this.value);
+            }
+        });
+    </script>
+</body>
+</html>

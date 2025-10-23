@@ -1,0 +1,350 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Update Return Status - Shop Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-sync-alt"></i> Update Return Status
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'purchase_return_detail' purchase_return.id %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Return
+        </a>
+    </div>
+</div>
+
+<!-- Display messages -->
+{% if messages %}
+<div class="container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Return Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Return Number:</strong> {{ purchase_return.return_number }}</p>
+                        <p><strong>Purchase Order:</strong> 
+                            PO-{{ purchase_return.purchase_order.po_number }}
+                            <span class="badge 
+                                {% if purchase_return.purchase_order.status == 'completed' %}bg-success
+                                {% elif purchase_return.purchase_order.status == 'returned' %}bg-info
+                                {% elif purchase_return.purchase_order.status == 'pending' %}bg-warning
+                                {% else %}bg-secondary{% endif %} ms-2">
+                                {{ purchase_return.purchase_order.get_status_display }}
+                            </span>
+                        </p>
+                        <p><strong>Supplier:</strong> {{ purchase_return.purchase_order.supplier.name }}</p>
+                        <p><strong>Original PO Amount:</strong> ৳{{ purchase_return.purchase_order.total_amount|floatformat:2 }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Current Status:</strong> 
+                            <span class="badge 
+                                {% if purchase_return.status == 'pending' %}bg-warning
+                                {% elif purchase_return.status == 'approved' %}bg-info
+                                {% elif purchase_return.status == 'completed' %}bg-success
+                                {% elif purchase_return.status == 'rejected' %}bg-danger
+                                {% else %}bg-secondary{% endif %}">
+                                {{ purchase_return.get_status_display }}
+                            </span>
+                        </p>
+                        <p><strong>Return Date:</strong> {{ purchase_return.return_date|date:"M d, Y" }}</p>
+                        <p><strong>Return Amount:</strong> ৳{{ purchase_return.return_amount|floatformat:2 }}</p>
+                        <p><strong>Net PO Amount:</strong> ৳{{ purchase_return.purchase_order.net_amount|floatformat:2 }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-edit"></i> Update Status
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="statusUpdateForm">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="status" class="form-label">
+                            New Status <span class="text-danger">*</span>
+                        </label>
+                        <select name="status" id="status" class="form-select" required>
+                            <option value="">Select Status</option>
+                            {% for status_value, status_label in status_choices %}
+                                <option value="{{ status_value }}" 
+                                    {% if purchase_return.status == status_value %}selected{% endif %}>
+                                    {{ status_label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">
+                            Notes / Reason for Status Change
+                        </label>
+                        <textarea name="notes" id="notes" class="form-control" rows="4" 
+                                  placeholder="Explain the reason for this status change...">{{ request.POST.notes }}</textarea>
+                    </div>
+
+                    <!-- Warning for status changes -->
+                    <div id="statusWarning" class="alert alert-warning d-none">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span id="warningText"></span>
+                    </div>
+
+                    <!-- Impact Preview -->
+                    <div id="impactPreview" class="alert alert-info d-none">
+                        <i class="fas fa-info-circle"></i>
+                        <span id="impactText"></span>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <button type="submit" class="btn btn-primary w-100" id="submitBtn">
+                                <i class="fas fa-save"></i> Update Status
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="{% url 'purchase_return_detail' purchase_return.id %}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Return Items -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-boxes"></i> Return Items ({{ purchase_return.items.count }})
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    {% for item in purchase_return.items.all %}
+                    <div class="list-group-item px-0">
+                        <h6 class="mb-1">{{ item.purchase_order_item.product.name }}</h6>
+                        <small class="text-muted">
+                            Quantity: {{ item.quantity }} | 
+                            Cost: ৳{{ item.unit_cost|floatformat:2 }} | 
+                            Total: ৳{{ item.total_cost|floatformat:2 }}
+                        </small>
+                        {% if item.batch %}
+                        <div class="mt-1">
+                            <small class="text-info">
+                                <i class="fas fa-tag"></i> Batch: {{ item.batch.batch_number }}
+                                (Current: {{ item.batch.current_quantity }})
+                            </small>
+                        </div>
+                        {% endif %}
+                        {% if item.reason %}
+                        <div class="mt-1">
+                            <small class="text-warning">
+                                <i class="fas fa-comment"></i> Reason: {{ item.get_reason_display }}
+                            </small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted">
+                        <i class="fas fa-exclamation-circle fa-2x mb-2"></i>
+                        <p>No items in this return</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Impact -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-money-bill-wave"></i> Financial Impact
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <small class="text-muted">Original PO</small>
+                        <h6 class="mb-0">৳{{ purchase_return.purchase_order.total_amount|floatformat:2 }}</h6>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">This Return</small>
+                        <h6 class="mb-0 text-danger">-৳{{ purchase_return.return_amount|floatformat:2 }}</h6>
+                    </div>
+                </div>
+                <hr class="my-2">
+                <div class="row text-center">
+                    <div class="col-12">
+                        <small class="text-muted">Net Amount</small>
+                        <h5 class="mb-0 text-success">৳{{ purchase_return.purchase_order.net_amount|floatformat:2 }}</h5>
+                    </div>
+                </div>
+                
+                <!-- Supplier Bill Info -->
+                {% with purchase_return.purchase_order.supplierbill as supplier_bill %}
+                {% if supplier_bill %}
+                <hr class="my-2">
+                <div class="mt-2">
+                    <small class="text-muted">Supplier Bill Status:</small>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge 
+                            {% if supplier_bill.status == 'paid' %}bg-success
+                            {% elif supplier_bill.status == 'partial' %}bg-info
+                            {% elif supplier_bill.status == 'overdue' %}bg-danger
+                            {% else %}bg-warning{% endif %}">
+                            {{ supplier_bill.get_status_display }}
+                        </span>
+                        <small>Due: ৳{{ supplier_bill.due_amount|floatformat:2 }}</small>
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <!-- Status Information -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Status Guide
+                </h6>
+            </div>
+            <div class="card-body">
+                <small>
+                    <p><strong>Pending:</strong> Return is awaiting review</p>
+                    <p><strong>Approved:</strong> Return has been approved but not processed</p>
+                    <p><strong>Completed:</strong> Return processed. Stock, PO status, and bill will be updated</p>
+                    <p><strong>Rejected:</strong> Return has been rejected</p>
+                </small>
+                <div class="alert alert-info mt-2">
+                    <small>
+                        <i class="fas fa-lightbulb"></i> 
+                        <strong>Note:</strong> Changing status to/from "Completed" will automatically update:
+                        <ul class="mb-0 mt-1">
+                            <li>Stock levels and batch quantities</li>
+                            <li>Purchase order status</li>
+                            <li>Supplier bill amounts</li>
+                        </ul>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const statusSelect = document.getElementById('status');
+    const warningDiv = document.getElementById('statusWarning');
+    const impactDiv = document.getElementById('impactPreview');
+    const warningText = document.getElementById('warningText');
+    const impactText = document.getElementById('impactText');
+    const submitBtn = document.getElementById('submitBtn');
+    const currentStatus = '{{ purchase_return.status }}';
+    const form = document.getElementById('statusUpdateForm');
+    const poStatus = '{{ purchase_return.purchase_order.status }}';
+    const returnAmount = parseFloat('{{ purchase_return.return_amount }}');
+
+    statusSelect.addEventListener('change', function() {
+        const newStatus = this.value;
+        warningDiv.classList.add('d-none');
+        impactDiv.classList.add('d-none');
+
+        if (newStatus === 'completed' && currentStatus !== 'completed') {
+            // Warning when marking as completed
+            warningText.innerHTML = 
+                '<strong>Important System Changes:</strong><br>' +
+                '• <strong>Stock Reduction:</strong> Product quantities will be decreased<br>' +
+                '• <strong>PO Status:</strong> Purchase order will be marked as "Returned"<br>' +
+                '• <strong>Bill Adjustment:</strong> Supplier bill amount will be reduced<br>' +
+                '• <strong>Permanent:</strong> This action cannot be automatically undone';
+            warningDiv.classList.remove('d-none');
+            
+            impactText.innerHTML = 
+                `<strong>Financial Impact Preview:</strong><br>
+                • Purchase Order: <strong>৳{{ purchase_return.purchase_order.total_amount|floatformat:2 }}</strong> → <strong>৳{{ purchase_return.purchase_order.net_amount|floatformat:2 }}</strong><br>
+                • Supplier Bill: Will be reduced by <strong>৳{{ purchase_return.return_amount|floatformat:2 }}</strong>`;
+            impactDiv.classList.remove('d-none');
+            
+            submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Complete Return & Update All';
+            submitBtn.className = 'btn btn-success w-100';
+            
+        } else if (currentStatus === 'completed' && newStatus !== 'completed') {
+            // Warning when reversing from completed
+            warningText.innerHTML = 
+                '<strong>System Reversal Warning:</strong><br>' +
+                '• <strong>Stock Restoration:</strong> Product quantities will be restored<br>' +
+                '• <strong>PO Status:</strong> Purchase order will revert to "Completed"<br>' +
+                '• <strong>Bill Restoration:</strong> Supplier bill will be restored to original amount<br>' +
+                '• <strong>Data Integrity:</strong> All related records will be updated';
+            warningDiv.classList.remove('d-none');
+            
+            impactText.innerHTML = 
+                `<strong>Reversal Impact Preview:</strong><br>
+                • Purchase Order: Will revert to "Completed" status<br>
+                • Supplier Bill: Will be restored to original amount<br>
+                • Stock Levels: All returned quantities will be added back`;
+            impactDiv.classList.remove('d-none');
+            
+            submitBtn.innerHTML = '<i class="fas fa-undo"></i> Reverse Completion & Restore All';
+            submitBtn.className = 'btn btn-warning w-100';
+            
+        } else {
+            // Regular status update
+            submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Status';
+            submitBtn.className = 'btn btn-primary w-100';
+        }
+    });
+
+    // Form submission confirmation for critical actions
+    form.addEventListener('submit', function(e) {
+        const newStatus = statusSelect.value;
+        
+        if (newStatus === 'completed' && currentStatus !== 'completed') {
+            if (!confirm('CONFIRM COMPLETION:\n\nThis will:\n• Reduce stock quantities permanently\n• Mark PO as "Returned"\n• Adjust supplier bill amount\n• Update financial records\n\nThis action cannot be automatically undone.\n\nProceed?')) {
+                e.preventDefault();
+                return false;
+            }
+        } else if (currentStatus === 'completed' && newStatus !== 'completed') {
+            if (!confirm('CONFIRM REVERSAL:\n\nThis will:\n• Restore stock quantities\n• Revert PO to "Completed"\n• Restore supplier bill amount\n• Reverse all related records\n\nProceed?')) {
+                e.preventDefault();
+                return false;
+            }
+        }
+        
+        return true;
+    });
+
+    // Initialize warning on page load if current status is completed
+    if (currentStatus === 'completed') {
+        statusSelect.dispatchEvent(new Event('change'));
+    }
+});
+</script>
+{% endblock %}

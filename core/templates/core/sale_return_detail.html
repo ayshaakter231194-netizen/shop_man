@@ -1,0 +1,481 @@
+{% extends 'base.html' %}
+
+{% block title %}Sale Return Details - {{ sale_return.return_number }}{% endblock %}
+
+{% block page_title %}
+<i class="fas fa-undo"></i> Sale Return Details - {{ sale_return.return_number }}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{% url 'sale_return_list' %}">Sale Returns</a></li>
+<li class="breadcrumb-item active">{{ sale_return.return_number }}</li>
+{% endblock %}
+
+{% block page_actions %}
+<div class="btn-group">
+    {% if sale_return.status == 'pending' or sale_return.status == 'approved' %}
+    <a href="{% url 'process_sale_return' sale_return.id %}" class="btn btn-primary">
+        <i class="fas fa-cog"></i> Process Return
+    </a>
+    {% endif %}
+    <a href="{% url 'sale_return_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-list"></i> Back to List
+    </a>
+</div>
+{% endblock %}
+
+{% block inner_content %}
+<div class="row">
+    <div class="col-md-8">
+        <!-- Return Information Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Return Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="40%">Return Number:</th>
+                                <td>
+                                    <strong>{{ sale_return.return_number }}</strong>
+                                    <span class="badge bg-{% if sale_return.status == 'pending' %}warning
+                                                          {% elif sale_return.status == 'approved' %}info
+                                                          {% elif sale_return.status == 'completed' %}success
+                                                          {% else %}danger{% endif %} ms-2">
+                                        {{ sale_return.get_status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Original Invoice:</th>
+                                <td>
+                                    <a href="{% url 'generate_invoice' sale_return.sale.invoice_number %}" 
+                                       class="text-decoration-none" target="_blank">
+                                        {{ sale_return.sale.invoice_number }}
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Customer:</th>
+                                <td>{{ sale_return.sale.customer_name|default:"Walk-in Customer" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Customer Phone:</th>
+                                <td>{{ sale_return.sale.customer_phone|default:"N/A" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Return Date:</th>
+                                <td>{{ sale_return.return_date|date:"M d, Y H:i" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="40%">Return Type:</th>
+                                <td>
+                                    <span class="badge bg-{% if sale_return.return_type == 'money' %}info{% else %}warning{% endif %}">
+                                        {{ sale_return.get_return_type_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Reason:</th>
+                                <td>{{ sale_return.get_reason_display }}</td>
+                            </tr>
+                            <tr>
+                                <th>Refund Amount:</th>
+                                <td class="fw-bold text-danger">৳{{ sale_return.refund_amount }}</td>
+                            </tr>
+                            {% if sale_return.return_type == 'product' %}
+                            <tr>
+                                <th>Exchange Product:</th>
+                                <td>
+                                    {% if sale_return.exchange_product %}
+                                    {{ sale_return.exchange_product.name }}
+                                    <span class="badge bg-secondary ms-1">
+                                        Qty: {{ sale_return.exchange_quantity }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted">Not selected</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% if sale_return.processed_by %}
+                            <tr>
+                                <th>Processed By:</th>
+                                <td>{{ sale_return.processed_by.get_full_name|default:sale_return.processed_by.username }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+                
+                {% if sale_return.description %}
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <strong>Description:</strong>
+                        <p class="mt-1 p-2 bg-light rounded">{{ sale_return.description|linebreaks }}</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Returned Items Card -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-boxes"></i> Returned Items
+                    <span class="badge bg-primary ms-2">{{ sale_return.items.count }} items</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Batch</th>
+                                <th>Sold Price</th>
+                                <th>Return Qty</th>
+                                <th>Total Amount</th>
+                                <th>Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in sale_return.items.all %}
+                            <tr>
+                                <td>
+                                    <strong>{{ item.sale_item.product.name }}</strong>
+                                    <br>
+                                    <small class="text-muted">SKU: {{ item.sale_item.product.sku }}</small>
+                                </td>
+                                <td>
+                                    {% if item.batch %}
+                                    <span class="badge bg-secondary">{{ item.batch.batch_number }}</span>
+                                    {% if item.batch.expiry_date %}
+                                    <br>
+                                    <small class="text-muted">
+                                        Exp: {{ item.batch.expiry_date|date:"M d, Y" }}
+                                    </small>
+                                    {% endif %}
+                                    {% else %}
+                                    <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>৳{{ item.unit_price }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ item.quantity }}</span>
+                                </td>
+                                <td class="fw-bold">৳{{ item.total_price }}</td>
+                                <td>
+                                    <span class="badge bg-light text-dark">{{ item.get_reason_display }}</span>
+                                    {% if item.notes %}
+                                    <br>
+                                    <small class="text-muted" title="{{ item.notes }}">
+                                        <i class="fas fa-sticky-note"></i> {{ item.notes|truncatewords:5 }}
+                                    </small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <i class="fas fa-exclamation-circle text-muted fa-2x mb-2"></i>
+                                    <p class="text-muted">No items found in this return.</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-primary">
+                                <td colspan="4" class="text-end fw-bold">Total Refund:</td>
+                                <td class="fw-bold">৳{{ sale_return.refund_amount }}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Original Sale Information -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-receipt"></i> Original Sale Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-borderless">
+                    <tr>
+                        <th>Invoice:</th>
+                        <td>
+                            <a href="{% url 'generate_invoice' sale_return.sale.invoice_number %}" 
+                               class="text-decoration-none" target="_blank">
+                                {{ sale_return.sale.invoice_number }}
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Sale Date:</th>
+                        <td>{{ sale_return.sale.sale_date|date:"M d, Y H:i" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Customer:</th>
+                        <td>{{ sale_return.sale.customer_name|default:"Walk-in Customer" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Sold By:</th>
+                        <td>{{ sale_return.sale.sold_by.get_full_name|default:sale_return.sale.sold_by.username }}</td>
+                    </tr>
+                    <tr>
+                        <th>Sale Amount:</th>
+                        <td class="fw-bold">৳{{ sale_return.sale.total_amount }}</td>
+                    </tr>
+                    <tr>
+                        <th>Items Sold:</th>
+                        <td>{{ sale_return.sale.items.count }} items</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Actions Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cogs"></i> Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if sale_return.status == 'pending' %}
+                    <a href="{% url 'process_sale_return' sale_return.id %}" class="btn btn-warning">
+                        <i class="fas fa-check-circle"></i> Review & Approve
+                    </a>
+                    {% elif sale_return.status == 'approved' %}
+                    <a href="{% url 'process_sale_return' sale_return.id %}" class="btn btn-success">
+                        <i class="fas fa-check-double"></i> Complete Return
+                    </a>
+                    {% endif %}
+                    
+                    <a href="{% url 'sale_return_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                    
+                    {% if user.is_superuser or user.userprofile.role == 'admin' %}
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                        <i class="fas fa-trash"></i> Delete Return
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Information -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history"></i> Status Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item {% if sale_return.status != 'rejected' %}active{% endif %}">
+                        <div class="timeline-marker bg-primary"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Created</h6>
+                            <small class="text-muted">{{ sale_return.created_at|date:"M d, Y H:i" }}</small>
+                            <p class="mb-0">Return request submitted</p>
+                        </div>
+                    </div>
+                    
+                    {% if sale_return.status == 'approved' or sale_return.status == 'completed' %}
+                    <div class="timeline-item {% if sale_return.status != 'completed' %}active{% endif %}">
+                        <div class="timeline-marker bg-success"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Approved</h6>
+                            {% if sale_return.processed_by %}
+                            <small class="text-muted">
+                                By: {{ sale_return.processed_by.get_full_name|default:sale_return.processed_by.username }}
+                            </small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if sale_return.status == 'completed' %}
+                    <div class="timeline-item active">
+                        <div class="timeline-marker bg-info"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Completed</h6>
+                            <small class="text-muted">
+                                {% if sale_return.return_type == 'money' %}
+                                Money refund processed
+                                {% else %}
+                                Product exchange completed
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if sale_return.status == 'rejected' %}
+                    <div class="timeline-item active">
+                        <div class="timeline-marker bg-danger"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Rejected</h6>
+                            <small class="text-muted">
+                                By: {{ sale_return.processed_by.get_full_name|default:sale_return.processed_by.username }}
+                            </small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Impact Summary -->
+        {% if sale_return.status == 'completed' %}
+        <div class="card mt-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-boxes"></i> Stock Impact
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>Returned Items (Stock Added Back):</h6>
+                <ul class="list-group list-group-flush">
+                    {% for item in sale_return.items.all %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ item.sale_item.product.name }}
+                        <span class="badge bg-success rounded-pill">+{{ item.quantity }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                
+                {% if sale_return.return_type == 'product' and sale_return.exchange_product %}
+                <hr>
+                <h6>Exchanged Item (Stock Reduced):</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ sale_return.exchange_product.name }}
+                        <span class="badge bg-danger rounded-pill">-{{ sale_return.exchange_quantity }}</span>
+                    </li>
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+{% if user.is_superuser or user.userprofile.role == 'admin' %}
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this sale return?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone. All return items and related data will be permanently deleted.
+                </div>
+                <ul>
+                    <li>Return Number: <strong>{{ sale_return.return_number }}</strong></li>
+                    <li>Refund Amount: <strong>৳{{ sale_return.refund_amount }}</strong></li>
+                    <li>Items: <strong>{{ sale_return.items.count }}</strong></li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'sale_return_delete' sale_return.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete Return</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 20px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -20px;
+    top: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #dee2e6;
+}
+
+.timeline-item.active .timeline-marker {
+    background-color: #0d6efd;
+}
+
+.timeline-content {
+    padding-bottom: 10px;
+}
+
+.timeline-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: -15px;
+    top: 12px;
+    bottom: -10px;
+    width: 2px;
+    background-color: #dee2e6;
+}
+
+.timeline-item.active:not(:last-child)::after {
+    background-color: #0d6efd;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Add confirmation for delete action
+    $('.btn-danger').on('click', function(e) {
+        if (!confirm('Are you absolutely sure you want to delete this sale return? This action cannot be undone.')) {
+            e.preventDefault();
+        }
+    });
+
+    // Print functionality
+    $('.btn-print').on('click', function() {
+        window.print();
+    });
+});
+</script>
+{% endblock %}

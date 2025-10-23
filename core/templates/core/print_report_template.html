@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Report - {{ report_type|title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @media print {
+            @page {
+                size: A4;
+                margin: 1cm;
+            }
+            body {
+                font-family: 'Arial', sans-serif;
+                font-size: 12px;
+                line-height: 1.4;
+                color: #000;
+                background: white;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+            .card {
+                border: 1px solid #000 !important;
+                box-shadow: none !important;
+                margin-bottom: 15px;
+            }
+            .table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 10px;
+            }
+            .table th,
+            .table td {
+                border: 1px solid #000;
+                padding: 6px;
+                text-align: left;
+            }
+            .table th {
+                background-color: #f8f9fa !important;
+                font-weight: bold;
+            }
+            .text-center {
+                text-align: center;
+            }
+            .text-right {
+                text-align: right;
+            }
+            .text-success {
+                color: #000 !important;
+            }
+            .text-danger {
+                color: #000 !important;
+            }
+            .bg-primary {
+                background-color: #f8f9fa !important;
+                color: #000 !important;
+            }
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #000;
+        }
+        
+        .company-info {
+            margin-bottom: 10px;
+        }
+        
+        .report-info {
+            margin-bottom: 15px;
+        }
+        
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-card {
+            border: 1px solid #000;
+            padding: 10px;
+            text-align: center;
+        }
+        
+        .summary-card h4 {
+            margin: 5px 0;
+            font-size: 16px;
+        }
+        
+        .summary-card small {
+            font-size: 10px;
+        }
+        
+        .table-responsive {
+            overflow-x: auto;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #000;
+            text-align: center;
+            font-size: 10px;
+        }
+        
+        .print-btn {
+            margin: 20px;
+            text-align: center;
+        }
+        
+        .badge {
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+
+        .alert {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    {% load humanize %}  <!-- ADD THIS LINE -->
+    
+    <!-- Print Button (visible only on screen) -->
+    <div class="print-btn no-print">
+        <button onclick="window.print()" class="btn btn-primary">
+            <i class="fas fa-print"></i> Print Report
+        </button>
+        <button onclick="window.close()" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Close
+        </button>
+    </div>
+
+    {% if error %}
+    <!-- Error Message -->
+    <div class="alert alert-danger">
+        <h4><i class="fas fa-exclamation-triangle"></i> Error Generating Report</h4>
+        <p>{{ error }}</p>
+    </div>
+    {% else %}
+
+    <!-- Report Header -->
+    <div class="header">
+        <div class="company-info">
+            <h2>Shop Management System</h2>
+            <p>Sales Report</p>
+        </div>
+        <div class="report-info">
+            <h3>
+                {% if report_type == 'daily' %}Daily Sales Report
+                {% elif report_type == 'date_range' %}Date Range Sales Report
+                {% elif report_type == 'product_wise' %}Product Wise Sales Report
+                {% elif report_type == 'category_wise' %}Category Wise Sales Report
+                {% elif report_type == 'user_wise' %}User Wise Sales Report
+                {% elif report_type == 'company_wise' %}Company Wise Sales Report
+                {% else %}Sales Report{% endif %}
+            </h3>
+            <p>
+                {% if date_range == 'custom' and start_date and end_date %}
+                    Period: {{ start_date }} to {{ end_date }}
+                {% elif date_range == 'today' %}
+                    Date: {{ today }}
+                {% elif date_range == 'yesterday' %}
+                    Date: {{ yesterday|date:'Y-m-d' }}
+                {% elif date_range == 'this_week' %}
+                    This Week (up to {{ today }})
+                {% elif date_range == 'last_week' %}
+                    Last Week
+                {% elif date_range == 'this_month' %}
+                    This Month (up to {{ today }})
+                {% elif date_range == 'last_month' %}
+                    Last Month
+                {% else %}
+                    Date: {{ selected_date|date:"F d, Y" }}
+                {% endif %}
+            </p>
+            
+            {% if selected_product %}
+            <p>Product: {{ selected_product.name }} ({{ selected_product.sku }})</p>
+            {% endif %}
+            
+            {% if selected_category %}
+            <p>Category: {{ selected_category.name }}</p>
+            {% endif %}
+            
+            {% if selected_user %}
+            <p>Sales Person: {{ selected_user.get_full_name|default:selected_user.username }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="summary-cards">
+        <div class="summary-card">
+            <small>Net Sales</small>
+            <h4>৳{{ net_sales|floatformat:2|intcomma }}</h4>
+            <small>After returns</small>
+        </div>
+        
+        <div class="summary-card">
+            <small>Gross Sales</small>
+            <h4>৳{{ gross_sales|floatformat:2|intcomma }}</h4>
+            <small>Before returns</small>
+        </div>
+        
+        <div class="summary-card">
+            <small>Total Returns</small>
+            <h4 class="text-danger">-৳{{ total_returns|floatformat:2|intcomma }}</h4>
+            <small>Refunds & exchanges</small>
+        </div>
+        
+        <div class="summary-card">
+            <small>Transactions</small>
+            <h4>{{ sales.count }}</h4>
+            <small>Completed sales</small>
+        </div>
+        
+        <div class="summary-card">
+            <small>Items Sold</small>
+            <h4>{{ net_items_sold }}</h4>
+            <small>After returns</small>
+        </div>
+        
+        <div class="summary-card">
+            <small>Avg. Sale</small>
+            <h4>৳{{ average_sale|floatformat:2|intcomma }}</h4>
+            <small>Per transaction</small>
+        </div>
+    </div>
+
+    <!-- Returns Summary (if include_returns) -->
+    {% if include_returns and total_returns > 0 %}
+    <div class="card">
+        <div class="card-header">
+            <h4>Returns Summary</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Items Sold:</strong> {{ total_items_sold }}</p>
+                    <p><strong>Items Returned:</strong> {{ total_items_returned }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Return Rate:</strong> 
+                        {% if gross_sales > 0 %}
+                            {{ total_returns|floatformat:2 }}{% widthratio total_returns gross_sales 100 %}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </p>
+                    <p><strong>Net Items:</strong> {{ net_items_sold }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Sales Transactions Table -->
+    <div class="card">
+        <div class="card-header">
+            <h4>Sales Transactions ({{ sales.count }} transactions)</h4>
+        </div>
+        <div class="card-body p-0">
+            {% if sales %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Invoice #</th>
+                            <th>Customer</th>
+                            <th class="text-center">Items</th>
+                            <th class="text-center">Returns</th>
+                            <th class="text-end">Gross Amount</th>
+                            <th class="text-end">Returns</th>
+                            <th class="text-end">Net Amount</th>
+                            <th class="text-center">Time</th>
+                            <th class="text-center">Sold By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sale in sales %}
+                        <tr>
+                            <td>
+                                <strong>#{{ sale.invoice_number }}</strong>
+                                {% if sale.has_returns %}
+                                <span class="badge bg-warning" title="Has returns">R</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ sale.customer_name|default:"Walk-in Customer" }}
+                                {% if sale.customer_phone %}
+                                <br>
+                                <small>{{ sale.customer_phone }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-primary">{{ sale.get_total_items }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% if sale.total_returned_quantity > 0 %}
+                                <span class="badge bg-danger">{{ sale.total_returned_quantity }}</span>
+                                {% else %}
+                                <span>-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                ৳{{ sale.total_amount|floatformat:2|intcomma }}
+                            </td>
+                            <td class="text-end">
+                                {% if sale.returned_amount > 0 %}
+                                <span class="text-danger">-৳{{ sale.returned_amount|floatformat:2|intcomma }}</span>
+                                {% else %}
+                                <span>-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <strong>৳{{ sale.net_amount|floatformat:2|intcomma }}</strong>
+                            </td>
+                            <td class="text-center">
+                                <small>{{ sale.sale_date|date:"h:i A" }}</small>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary">{{ sale.sold_by.username }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>Totals:</strong></td>
+                            <td class="text-end"><strong>৳{{ gross_sales|floatformat:2|intcomma }}</strong></td>
+                            <td class="text-end"><strong class="text-danger">-৳{{ total_returns|floatformat:2|intcomma }}</strong></td>
+                            <td class="text-end"><strong>৳{{ net_sales|floatformat:2|intcomma }}</strong></td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <p>No sales transactions found for the selected criteria.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Top Products Section -->
+    {% if top_products %}
+    <div class="card mt-4">
+        <div class="card-header">
+            <h4>Top Selling Products</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>SKU</th>
+                            <th class="text-center">Quantity Sold</th>
+                            <th class="text-end">Total Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in top_products %}
+                        <tr>
+                            <td>{{ product.product__name }}</td>
+                            <td>{{ product.product__sku }}</td>
+                            <td class="text-center">{{ product.total_quantity }}</td>
+                            <td class="text-end">৳{{ product.total_amount|floatformat:2|intcomma }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Report Footer -->
+    <div class="footer">
+        <p>Report generated on: {{ generated_at|date:"F d, Y h:i A" }}</p>
+        <p>Shop Management System - Confidential</p>
+    </div>
+
+    {% endif %}
+
+    <script>
+        // Auto-print when page loads
+        window.onload = function() {
+            // Wait a bit for all content to load
+            setTimeout(function() {
+                window.print();
+            }, 1000);
+        };
+
+        // After print, close window or show message
+        window.onafterprint = function() {
+            // Optional: close window after print
+            // setTimeout(function() {
+            //     window.close();
+            // }, 1000);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Purchase Return - Shop Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-undo"></i> Create Purchase Return
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'purchase_return_list' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Returns
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Return Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="returnForm">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <!-- Purchase Order -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.purchase_order.id_for_label }}" class="form-label">
+                                Purchase Order <span class="text-danger">*</span>
+                            </label>
+                            {{ form.purchase_order }}
+                            {% if form.purchase_order.errors %}
+                                <div class="text-danger small">{{ form.purchase_order.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Reason -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.reason.id_for_label }}" class="form-label">
+                                Reason <span class="text-danger">*</span>
+                            </label>
+                            {{ form.reason }}
+                            {% if form.reason.errors %}
+                                <div class="text-danger small">{{ form.reason.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">
+                            Description
+                        </label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="text-danger small">{{ form.description.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">
+                            Provide detailed explanation for the return
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-save"></i> Create Return Request
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="{% url 'purchase_return_list' %}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Quick Actions -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-bolt"></i> Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'purchase_report' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-shopping-cart"></i> View Purchase Orders
+                    </a>
+                    <a href="{% url 'expiry_report' %}" class="btn btn-outline-warning">
+                        <i class="fas fa-calendar-times"></i> Check Expiry Report
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Returnable Orders -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-history"></i> Recent Orders
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if returnable_orders %}
+                <div class="list-group list-group-flush">
+                    {% for order in returnable_orders %}
+                    <div class="list-group-item px-0">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">PO-{{ order.po_number }}</h6>
+                            <small>{{ order.order_date|date:"M d" }}</small>
+                        </div>
+                        <p class="mb-1 small">{{ order.supplier.name }}</p>
+                        <small class="text-muted">৳{{ order.total_amount|floatformat:2 }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted">
+                    <i class="fas fa-box-open fa-2x mb-2"></i>
+                    <p>No recent orders available for return</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add any JavaScript needed for form validation
+});
+</script>
+{% endblock %}

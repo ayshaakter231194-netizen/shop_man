@@ -1,0 +1,565 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Invoice {{ sale.invoice_number }} - Shop Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">
+            <i class="fas fa-receipt"></i> Invoice
+        </h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <div class="btn-group me-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.print()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <a href="{% url 'pos_sale' %}" class="btn btn-sm btn-outline-success">
+                    <i class="fas fa-cash-register"></i> New Sale
+                </a>
+                <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <!-- Invoice Header -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h2 class="text-primary mb-1">INVOICE</h2>
+                    <p class="text-muted mb-0">#{{ sale.invoice_number }}</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <h4 class="mb-1">Shop Management System</h4>
+                    <p class="text-muted mb-0">
+                        123 Business Street<br>
+                        City, State 12345<br>
+                        Phone: (555) 123-4567<br>
+                        Email: info@shopmanagement.com
+                    </p>
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- Invoice Details -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h5 class="mb-2">Bill To:</h5>
+                    <p class="mb-1">
+                        <strong>{{ sale.customer_name|default:"Walk-in Customer" }}</strong>
+                    </p>
+                    {% if sale.customer_phone %}
+                    <p class="mb-1 text-muted">
+                        <i class="fas fa-phone"></i> {{ sale.customer_phone }}
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted">Invoice Date:</td>
+                            <td class="text-end"><strong>{{ sale.sale_date|date:"M d, Y" }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Invoice Time:</td>
+                            <td class="text-end"><strong>{{ sale.sale_date|date:"h:i A" }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Sold By:</td>
+                            <td class="text-end"><strong>{{ sale.sold_by.get_full_name|default:sale.sold_by.username }}</strong></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Items Table -->
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-center">#</th>
+                            <th>Item Description</th>
+                            <th class="text-center">Quantity</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in sale.items.all %}
+                        <tr>
+                            <td class="text-center">{{ forloop.counter }}</td>
+                            <td>
+                                <strong>{{ item.product.name }}</strong><br>
+                                <small class="text-muted">SKU: {{ item.product.sku }}</small>
+                            </td>
+                            <td class="text-center">{{ item.quantity }}</td>
+                            <td class="text-end">৳{{ item.unit_price|floatformat:2|intcomma }}</td>
+                            <td class="text-end">৳{{ item.total_price|floatformat:2|intcomma }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Totals -->
+            <div class="row">
+                <div class="col-lg-8">
+                    <!-- Payment Details -->
+                    <div class="card border-0 bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title">
+                                <i class="fas fa-credit-card"></i> Payment Details
+                            </h6>
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <small class="text-muted">Payment Method:</small>
+                                    <p class="mb-1"><strong>Cash</strong></p>
+                                </div>
+                                <div class="col-sm-6">
+                                    <small class="text-muted">Payment Status:</small>
+                                    <p class="mb-1">
+                                        <span class="badge bg-success">Paid</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Terms & Notes -->
+                    <div class="mt-3">
+                        <h6>Terms & Conditions:</h6>
+                        <ul class="small text-muted">
+                            <li>Goods once sold will not be taken back</li>
+                            <li>Warranty as per manufacturer terms</li>
+                            <li>This is a computer generated invoice</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <tr>
+                                <td class="text-end"><strong>Subtotal:</strong></td>
+                                <td class="text-end">৳{{ sale.subtotal|floatformat:2|intcomma }}</td>
+                            </tr>
+                            {% if sale.tax_amount %}
+                            <tr>
+                                <td class="text-end"><strong>Tax ({{ sale.tax_percentage }}%):</strong></td>
+                                <td class="text-end">৳{{ sale.tax_amount|floatformat:2|intcomma }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if sale.discount_amount %}
+                            <tr>
+                                <td class="text-end"><strong>Discount:</strong></td>
+                                <td class="text-end">-৳{{ sale.discount_amount|floatformat:2|intcomma }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr class="table-active">
+                                <td class="text-end"><strong>Total Amount:</strong></td>
+                                <td class="text-end"><strong>৳{{ sale.total_amount|floatformat:2|intcomma }}</strong></td>
+                            </tr>
+                            {% if sale.paid_amount %}
+                            <tr>
+                                <td class="text-end"><strong>Paid Amount:</strong></td>
+                                <td class="text-end">৳{{ sale.paid_amount|floatformat:2|intcomma }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if sale.change_amount %}
+                            <tr>
+                                <td class="text-end"><strong>Change Given:</strong></td>
+                                <td class="text-end text-success">৳{{ sale.change_amount|floatformat:2|intcomma }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+
+                    <!-- QR Code for Digital Payment (Placeholder) -->
+                    <div class="text-center mt-3">
+                        <div class="border rounded p-3 d-inline-block">
+                            <i class="fas fa-qrcode fa-3x text-muted"></i>
+                            <p class="small text-muted mb-0">Scan to Pay</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="row mt-5 pt-4 border-top">
+                <div class="col-md-6 text-center">
+                    <p class="mb-1">
+                        <strong>Customer Signature</strong>
+                    </p>
+                    <div class="border-bottom" style="height: 50px;"></div>
+                </div>
+                <div class="col-md-6 text-center">
+                    <p class="mb-1">
+                        <strong>Authorized Signature</strong>
+                    </p>
+                    <div class="border-bottom" style="height: 50px;"></div>
+                </div>
+            </div>
+
+            <!-- Thank You Message -->
+            <div class="text-center mt-4">
+                <p class="text-muted mb-1">Thank you for your business!</p>
+                <p class="text-muted small">
+                    For any queries, please contact: support@shopmanagement.com | Phone: (555) 123-4567
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-primary" onclick="window.print()">
+                    <i class="fas fa-print"></i> Print Invoice
+                </button>
+                <button type="button" class="btn btn-success" onclick="downloadPDF()">
+                    <i class="fas fa-download"></i> Download PDF
+                </button>
+                <button type="button" class="btn btn-info" onclick="sendEmail()">
+                    <i class="fas fa-envelope"></i> Email Invoice
+                </button>
+                <a href="{% url 'pos_sale' %}" class="btn btn-warning">
+                    <i class="fas fa-cash-register"></i> New Sale
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Email Modal -->
+<div class="modal fade" id="emailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Email Invoice</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="emailForm">
+                    <div class="mb-3">
+                        <label for="customerEmail" class="form-label">Customer Email Address</label>
+                        <input type="email" class="form-control" id="customerEmail" 
+                               placeholder="customer@example.com" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailSubject" class="form-label">Subject</label>
+                        <input type="text" class="form-control" id="emailSubject" 
+                               value="Invoice {{ sale.invoice_number }} - Shop Management System" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailMessage" class="form-label">Message</label>
+                        <textarea class="form-control" id="emailMessage" rows="4" required>
+Dear {{ sale.customer_name|default:"Valued Customer" }},
+
+Thank you for your purchase. Please find your invoice attached.
+
+Invoice Number: {{ sale.invoice_number }}
+Date: {{ sale.sale_date|date:"M d, Y" }}
+Total Amount: ৳{{ sale.total_amount|floatformat:2|intcomma }}
+
+If you have any questions, please don't hesitate to contact us.
+
+Best regards,
+Shop Management Team
+                        </textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="sendEmailNow()">
+                    <i class="fas fa-paper-plane"></i> Send Email
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Print styles
+function setupPrintStyles() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+        @media print {
+            .btn-toolbar, .btn-group, .card-header, .border-top, .text-center .btn-group {
+                display: none !important;
+            }
+            .card {
+                border: none !important;
+                box-shadow: none !important;
+            }
+            .card-body {
+                padding: 0 !important;
+            }
+            .table-bordered {
+                border: 1px solid #dee2e6 !important;
+            }
+            .table-bordered th,
+            .table-bordered td {
+                border: 1px solid #dee2e6 !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .container-fluid {
+                max-width: 100% !important;
+                padding: 0 !important;
+            }
+            .text-primary {
+                color: #000 !important;
+            }
+            .bg-light {
+                background-color: #f8f9fa !important;
+            }
+            .table-active {
+                background-color: rgba(0,0,0,.075) !important;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Download PDF (placeholder function)
+function downloadPDF() {
+    // In a real implementation, this would generate a PDF
+    // For now, we'll show a message and offer print instead
+    if (confirm('PDF download functionality would be implemented with a backend service. Would you like to print instead?')) {
+        window.print();
+    }
+}
+
+// Show email modal
+function sendEmail() {
+    const emailModal = new bootstrap.Modal(document.getElementById('emailModal'));
+    emailModal.show();
+}
+
+// Send email (placeholder function)
+function sendEmailNow() {
+    const email = document.getElementById('customerEmail').value;
+    const subject = document.getElementById('emailSubject').value;
+    const message = document.getElementById('emailMessage').value;
+    
+    if (!email) {
+        alert('Please enter customer email address.');
+        return;
+    }
+    
+    // In a real implementation, this would send an AJAX request to the backend
+    // For now, we'll show a success message
+    alert(`Invoice would be sent to ${email}\n\nSubject: ${subject}\n\nMessage: ${message}`);
+    
+    const emailModal = bootstrap.Modal.getInstance(document.getElementById('emailModal'));
+    emailModal.hide();
+}
+
+// Share invoice
+function shareInvoice() {
+    if (navigator.share) {
+        navigator.share({
+            title: 'Invoice {{ sale.invoice_number }}',
+            text: 'Invoice from Shop Management System',
+            url: window.location.href,
+        })
+        .then(() => console.log('Successful share'))
+        .catch((error) => console.log('Error sharing:', error));
+    } else {
+        alert('Web Share API not supported in your browser. You can copy the URL manually.');
+    }
+}
+
+// Copy invoice link
+function copyInvoiceLink() {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(function() {
+        alert('Invoice link copied to clipboard!');
+    }, function() {
+        alert('Failed to copy invoice link.');
+    });
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    setupPrintStyles();
+    
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'p') {
+            e.preventDefault();
+            window.print();
+        }
+        if (e.ctrlKey && e.key === 'e') {
+            e.preventDefault();
+            sendEmail();
+        }
+    });
+    
+    // Show invoice generated time
+    console.log('Invoice generated at: ', new Date().toLocaleString());
+});
+</script>
+
+<style>
+/* Invoice specific styles */
+.invoice-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    margin-bottom: 2rem;
+}
+
+.invoice-details {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.875rem;
+    letter-spacing: 0.5px;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.table-bordered {
+    border: 1px solid #dee2e6;
+}
+
+.table-bordered th,
+.table-bordered td {
+    border: 1px solid #dee2e6;
+}
+
+.card {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.badge {
+    font-size: 0.75em;
+    font-weight: 500;
+}
+
+.text-muted {
+    color: #6c757d !important;
+}
+
+/* Print-specific styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #dee2e6 !important;
+    }
+    
+    .btn-group, .btn-toolbar {
+        display: none !important;
+    }
+    
+    body {
+        background: white !important;
+        font-size: 12pt !important;
+        line-height: 1.4 !important;
+    }
+    
+    .container-fluid {
+        max-width: 100% !important;
+        padding: 0 !important;
+    }
+    
+    .table {
+        font-size: 10pt !important;
+    }
+    
+    .text-primary {
+        color: #000 !important;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .text-md-end {
+        text-align: left !important;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.5rem;
+        border-radius: 0.375rem !important;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+}
+
+/* Animation for print button */
+@keyframes printPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.btn-primary:hover {
+    animation: printPulse 0.5s ease-in-out;
+}
+
+/* QR Code placeholder styling */
+.fa-qrcode {
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.fa-qrcode:hover {
+    opacity: 1;
+}
+
+/* Signature lines */
+.border-bottom {
+    border-bottom: 2px dotted #dee2e6 !important;
+}
+
+/* Totals table highlighting */
+.table-active {
+    background-color: #e9ecef !important;
+    font-weight: bold;
+}
+
+/* Hover effects */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.075);
+}
+
+/* Custom scrollbar for modal */
+.modal-body textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+</style>
+{% endblock %}

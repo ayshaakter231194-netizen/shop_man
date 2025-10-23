@@ -1,0 +1,388 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Return Items - {{ sale.invoice_number }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Return Items for {{ sale.invoice_number }}</h3>
+            </div>
+            <div class="card-body">
+                <form method="post" id="returnForm">
+                    {% csrf_token %}
+                    
+                    <h5>Return Details</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ form.reason.label_tag }}
+                                {{ form.reason }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                {{ form.return_type.label_tag }}
+                                {{ form.return_type }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="exchangeSection" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ form.exchange_product.label_tag }}
+                                    {{ form.exchange_product }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ form.exchange_quantity.label_tag }}
+                                    {{ form.exchange_quantity }}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Price Difference Calculation -->
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="card border-info">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="card-title mb-0">
+                                            <i class="fas fa-exchange-alt"></i> Price Difference Calculation
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <strong>Total Return Value:</strong>
+                                                <div id="totalReturnValue" class="text-danger">৳0.00</div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <strong>Exchange Product Value:</strong>
+                                                <div id="exchangeProductValue" class="text-info">৳0.00</div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <strong>Balance Amount:</strong>
+                                                <div id="balanceAmount" class="fw-bold">৳0.00</div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2" id="balanceMessage">
+                                            <!-- Balance message will appear here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        {{ form.description.label_tag }}
+                        {{ form.description }}
+                    </div>
+                    
+                    <hr>
+                    <h5>Select Items to Return</h5>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Sold Qty</th>
+                                    <th>Returned</th>
+                                    <th>Available</th>
+                                    <th>Return Qty</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in sale_items %}
+                                <tr>
+                                    <td>{{ item.product.name }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.returned_quantity }}</td>
+                                    <td>{{ item.remaining_quantity }}</td>
+                                    <td>
+                                        <input type="number" name="items[{{ forloop.counter0 }}].quantity" 
+                                               class="form-control return-qty" min="0" max="{{ item.remaining_quantity }}" 
+                                               value="0" data-price="{{ item.unit_price }}">
+                                        <input type="hidden" name="items[{{ forloop.counter0 }}].sale_item" value="{{ item.id }}">
+                                    </td>
+                                    <td>
+                                        <select name="items[{{ forloop.counter0 }}].reason" class="form-control">
+                                            <option value="defective">Defective</option>
+                                            <option value="wrong_item">Wrong Item</option>
+                                            <option value="changed_mind">Changed Mind</option>
+                                            <option value="quality_issue">Quality Issue</option>
+                                            <option value="expired">Expired</option>
+                                            <option value="damaged">Damaged</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                        <textarea name="items[{{ forloop.counter0 }}].notes" class="form-control mt-1" 
+                                                  placeholder="Notes..." rows="1"></textarea>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Summary</h5>
+                            <p>Total Refund Amount: <strong id="totalRefund">৳0.00</strong></p>
+                            <button type="submit" class="btn btn-primary">Create Return</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Sale Information</h3>
+            </div>
+            <div class="card-body">
+                <p><strong>Invoice:</strong> {{ sale.invoice_number }}</p>
+                <p><strong>Customer:</strong> {{ sale.customer_name }}</p>
+                <p><strong>Phone:</strong> {{ sale.customer_phone }}</p>
+                <p><strong>Date:</strong> {{ sale.sale_date|date:"M d, Y H:i" }}</p>
+                <p><strong>Total Amount:</strong> ৳{{ sale.total_amount }}</p>
+                <p><strong>Sold By:</strong> {{ sale.sold_by.get_full_name }}</p>
+            </div>
+        </div>
+        
+        <!-- Exchange Product Info -->
+        <div class="card mt-3" id="exchangeProductInfo" style="display: none;">
+            <div class="card-header">
+                <h3 class="card-title">Exchange Product Info</h3>
+            </div>
+            <div class="card-body">
+                <div id="exchangeProductDetails">
+                    <!-- Product details will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Store product prices for quick access
+let productPrices = {};
+
+// Preload product prices
+{% for product in products %}
+productPrices[{{ product.id }}] = {{ product.selling_price }};
+{% endfor %}
+
+$(document).ready(function() {
+    // Show/hide exchange section based on return type
+    $('#id_return_type').change(function() {
+        if ($(this).val() === 'product') {
+            $('#exchangeSection').show();
+            $('#exchangeProductInfo').show();
+            $('#id_exchange_quantity').prop('required', true);
+            calculatePriceDifference(); // Calculate when section is shown
+        } else {
+            $('#exchangeSection').hide();
+            $('#exchangeProductInfo').hide();
+            $('#id_exchange_quantity').prop('required', false);
+        }
+    });
+    
+    // Load exchange product details when selected
+    $('#id_exchange_product').change(function() {
+        const productId = $(this).val();
+        if (productId) {
+            loadExchangeProductDetails(productId);
+            calculatePriceDifference();
+        } else {
+            $('#exchangeProductDetails').html('<p class="text-muted">Select a product to see details</p>');
+            calculatePriceDifference();
+        }
+    });
+    
+    // Recalculate when exchange quantity changes
+    $('#id_exchange_quantity').on('input', function() {
+        calculatePriceDifference();
+    });
+    
+    // Calculate total refund and price difference
+    function calculateTotal() {
+        let total = 0;
+        $('.return-qty').each(function() {
+            const qty = parseInt($(this).val()) || 0;
+            const price = parseFloat($(this).data('price')) || 0;
+            total += qty * price;
+        });
+        $('#totalRefund').text('৳' + total.toFixed(2));
+        calculatePriceDifference();
+        return total;
+    }
+    
+    // Load exchange product details via AJAX
+    function loadExchangeProductDetails(productId) {
+        $.ajax({
+            url: '{% url "get_product_details" %}',
+            data: {
+                'product_id': productId
+            },
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    const product = data.product;
+                    const html = `
+                        <p><strong>Product:</strong> ${product.name}</p>
+                        <p><strong>Price:</strong> ৳${product.selling_price}</p>
+                        <p><strong>Stock:</strong> ${product.current_stock}</p>
+                        <p><strong>SKU:</strong> ${product.sku}</p>
+                    `;
+                    $('#exchangeProductDetails').html(html);
+                    productPrices[productId] = parseFloat(product.selling_price);
+                    calculatePriceDifference();
+                }
+            },
+            error: function() {
+                $('#exchangeProductDetails').html('<p class="text-danger">Error loading product details</p>');
+            }
+        });
+    }
+    
+    // Calculate price difference between returned items and exchange product
+    function calculatePriceDifference() {
+        const returnType = $('#id_return_type').val();
+        
+        if (returnType !== 'product') {
+            $('#totalReturnValue').text('৳0.00');
+            $('#exchangeProductValue').text('৳0.00');
+            $('#balanceAmount').text('৳0.00');
+            $('#balanceMessage').html('');
+            return;
+        }
+        
+        // Calculate total return value
+        const totalReturnValue = calculateTotal();
+        $('#totalReturnValue').text('৳' + totalReturnValue.toFixed(2));
+        
+        // Calculate exchange product value
+        const exchangeProductId = $('#id_exchange_product').val();
+        const exchangeQuantity = parseInt($('#id_exchange_quantity').val()) || 0;
+        
+        let exchangeProductValue = 0;
+        if (exchangeProductId && exchangeQuantity > 0) {
+            const productPrice = productPrices[exchangeProductId] || 0;
+            exchangeProductValue = exchangeQuantity * productPrice;
+        }
+        
+        $('#exchangeProductValue').text('৳' + exchangeProductValue.toFixed(2));
+        
+        // Calculate balance
+        const balance = totalReturnValue - exchangeProductValue;
+        $('#balanceAmount').text('৳' + Math.abs(balance).toFixed(2));
+        
+        // Show balance message
+        const balanceMessage = $('#balanceMessage');
+        balanceMessage.html('');
+        
+        if (balance > 0) {
+            // Customer gets refund (return value > exchange value)
+            balanceMessage.html(`
+                <div class="alert alert-success">
+                    <i class="fas fa-arrow-up"></i>
+                    <strong>Customer to receive:</strong> ৳${balance.toFixed(2)} refund
+                </div>
+            `);
+        } else if (balance < 0) {
+            // Customer pays extra (exchange value > return value)
+            balanceMessage.html(`
+                <div class="alert alert-warning">
+                    <i class="fas fa-arrow-down"></i>
+                    <strong>Customer to pay:</strong> ৳${Math.abs(balance).toFixed(2)} extra
+                </div>
+            `);
+        } else {
+            // Equal exchange
+            balanceMessage.html(`
+                <div class="alert alert-info">
+                    <i class="fas fa-equals"></i>
+                    <strong>Equal exchange:</strong> No balance amount
+                </div>
+            `);
+        }
+        
+        // Store balance amount in hidden field for form submission
+        if (!$('#balanceAmountField').length) {
+            $('<input>').attr({
+                type: 'hidden',
+                id: 'balanceAmountField',
+                name: 'balance_amount'
+            }).appendTo('#returnForm');
+        }
+        $('#balanceAmountField').val(balance);
+    }
+    
+    $('.return-qty').on('input', calculateTotal);
+    
+    // Initial calculations
+    calculateTotal();
+    
+    // Form submission validation
+    $('#returnForm').on('submit', function(e) {
+        const returnType = $('#id_return_type').val();
+        const exchangeProduct = $('#id_exchange_product').val();
+        const exchangeQuantity = parseInt($('#id_exchange_quantity').val()) || 0;
+        
+        if (returnType === 'product') {
+            if (!exchangeProduct) {
+                e.preventDefault();
+                alert('Please select an exchange product for product exchange.');
+                return false;
+            }
+            
+            if (exchangeQuantity <= 0) {
+                e.preventDefault();
+                alert('Please enter a valid exchange quantity.');
+                return false;
+            }
+            
+            // Check if exchange product has sufficient stock
+            const selectedProductPrice = productPrices[exchangeProduct];
+            if (selectedProductPrice !== undefined) {
+                // You might want to add stock validation here
+                const exchangeProductElement = $('#id_exchange_product option:selected');
+                const stockText = exchangeProductElement.text();
+                const stockMatch = stockText.match(/Stock: (\d+)/);
+                
+                if (stockMatch && parseInt(stockMatch[1]) < exchangeQuantity) {
+                    e.preventDefault();
+                    alert('Insufficient stock for the selected exchange product.');
+                    return false;
+                }
+            }
+        }
+        
+        // Validate that at least one item has return quantity
+        let hasReturnItems = false;
+        $('.return-qty').each(function() {
+            if (parseInt($(this).val()) > 0) {
+                hasReturnItems = true;
+                return false; // break loop
+            }
+        });
+        
+        if (!hasReturnItems) {
+            e.preventDefault();
+            alert('Please select at least one item to return.');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

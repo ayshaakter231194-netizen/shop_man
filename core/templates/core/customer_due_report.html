@@ -1,0 +1,732 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load custom_filters %}
+
+{% block title %}Customer Due Report{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-file-invoice-dollar text-danger"></i> Customer Due Report
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'due_collection_report' %}" class="btn btn-sm btn-outline-success me-2">
+            <i class="fas fa-money-bill-wave"></i> Collection Report
+        </a>
+        <button class="btn btn-sm btn-outline-primary me-2" onclick="showQuickPaymentModal()">
+            <i class="fas fa-plus-circle"></i> Quick Payment
+        </button>
+        <button class="btn btn-sm btn-outline-info me-2" onclick="refreshDueAmounts()">
+            <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
+            <i class="fas fa-print"></i> Print
+        </button>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-sm btn-outline-danger" onclick="applyQuickFilter('with_due')">
+                        <i class="fas fa-exclamation-circle"></i> Customers with Due ({{ customers_with_due }})
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="applyQuickFilter('without_due')">
+                        <i class="fas fa-check-circle"></i> Clear Customers
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="applyQuickFilter('high_due')">
+                        <i class="fas fa-filter"></i> High Due (>৳1000)
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" onclick="showBulkPaymentModal()">
+                        <i class="fas fa-money-bill-wave"></i> Bulk Payment
+                    </button>
+                    <button class="btn btn-sm btn-outline-dark" onclick="forceUpdateAllDueAmounts()">
+                        <i class="fas fa-hammer"></i> Force Update All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <i class="fas fa-filter"></i> Filters
+        </h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Search Customer</label>
+                <input type="text" class="form-control" name="customer" value="{{ filters.customer }}" 
+                       placeholder="Name or phone...">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Due Status</label>
+                <select class="form-select" name="due_status">
+                    <option value="all" {% if filters.due_status == 'all' %}selected{% endif %}>All Customers</option>
+                    <option value="with_due" {% if filters.due_status == 'with_due' %}selected{% endif %}>With Due Only</option>
+                    <option value="without_due" {% if filters.due_status == 'without_due' %}selected{% endif %}>Without Due</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Min Due</label>
+                <input type="number" class="form-control" name="min_due" value="{{ filters.min_due }}" 
+                       placeholder="0" step="0.01" min="0">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Max Due</label>
+                <input type="number" class="form-control" name="max_due" value="{{ filters.max_due }}" 
+                       placeholder="100000" step="0.01" min="0">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-flex gap-1">
+                    <button type="submit" class="btn btn-primary flex-fill">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <a href="{% url 'customer_due_report' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-redo"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h6 class="card-title">Total Customers</h6>
+                <h3>{{ total_customers }}</h3>
+                <small>{{ today|date:"M d, Y" }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h6 class="card-title">Customers with Due</h6>
+                <h3>{{ customers_with_due }}</h3>
+                <small>{{ total_customers|floatformat:0 }}% of total</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-danger">
+            <div class="card-body">
+                <h6 class="card-title">Total Due Amount</h6>
+                <h3>৳{{ total_due_amount|floatformat:2|intcomma }}</h3>
+                <small>Outstanding</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h6 class="card-title">Average Due</h6>
+                <h3>৳{{ avg_due_per_customer|floatformat:2|intcomma }}</h3>
+                <small>Per customer with due</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Status Alert -->
+<div class="alert alert-info d-flex align-items-center mb-4">
+    <i class="fas fa-info-circle me-2"></i>
+    <div>
+        <strong>Data Status:</strong> 
+        <span id="dataStatusText">Customer due amounts are automatically updated. Use refresh button if data seems outdated.</span>
+        <small class="d-block text-muted">Last updated: {% now "M d, Y H:i:s" %}</small>
+    </div>
+</div>
+
+<!-- Customers Table -->
+<div class="card">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            Customer Due Details 
+            <small class="text-muted">(Showing {{ customers|length }} of {{ total_customers }} customers)</small>
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Customer</th>
+                        <th>Phone</th>
+                        <th>Total Due</th>
+                        <th>Due Invoices</th>
+                        <th>Credit Limit</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for customer in customers %}
+                    <tr id="customer-{{ customer.id }}">
+                        <td>{{ forloop.counter0|add:customers.start_index }}</td>
+                        <td>
+                            <strong>{{ customer.name }}</strong>
+                            {% if customer.email %}
+                            <br><small class="text-muted">{{ customer.email }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ customer.phone }}</td>
+                        <td class="{% if customer.total_due > 0 %}text-danger fw-bold{% else %}text-success{% endif %}">
+                            <span id="due-amount-{{ customer.id }}">৳{{ customer.total_due|floatformat:2|intcomma }}</span>
+                            {% if customer.actual_due_amount and customer.actual_due_amount != customer.total_due %}
+                            <br><small class="text-warning">(Calc: ৳{{ customer.actual_due_amount|floatformat:2 }})</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if customer.due_invoices %}
+                            <span class="badge bg-warning">{{ customer.due_invoices_count }} invoices</span>
+                            {% else %}
+                            <span class="badge bg-success">No due</span>
+                            {% endif %}
+                        </td>
+                        <td>৳{{ customer.credit_limit|floatformat:2|intcomma }}</td>
+                        <td>
+                            {% if customer.total_due > customer.credit_limit %}
+                            <span class="badge bg-danger">Over Limit</span>
+                            {% elif customer.total_due > 0 %}
+                            <span class="badge bg-warning">Has Due</span>
+                            {% else %}
+                            <span class="badge bg-success">Clear</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                {% if customer.total_due > 0 %}
+                                <button class="btn btn-success" 
+                                        onclick="showPaymentModal({{ customer.id }}, '{{ customer.name|escapejs }}', {{ customer.total_due }})"
+                                        title="Collect Payment">
+                                    <i class="fas fa-money-bill-wave"></i> Pay
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-info" 
+                                        onclick="viewDueDetails({{ customer.id }})"
+                                        title="View Due Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <a href="{% url 'debug_customer_due' customer.id %}" class="btn btn-warning" title="Debug Due Amount">
+                                    <i class="fas fa-bug"></i>
+                                </a>
+                                <button class="btn btn-outline-primary" 
+                                        onclick="showQuickPaymentModal({{ customer.id }}, '{{ customer.name|escapejs }}', {{ customer.total_due }})"
+                                        title="Quick Payment">
+                                    <i class="fas fa-bolt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            <i class="fas fa-search fa-2x mb-2"></i>
+                            <p>No customers found matching your criteria</p>
+                            <a href="{% url 'customer_due_report' %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-redo"></i> Reset Filters
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if customers.has_other_pages %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if customers.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">First</a>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?page={{ customers.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Previous</a>
+        </li>
+        {% endif %}
+
+        {% for num in customers.paginator.page_range %}
+            {% if customers.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > customers.number|add:'-3' and num < customers.number|add:'3' %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+            </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if customers.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ customers.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Next</a>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?page={{ customers.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Last</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Process Due Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="paymentForm">
+                    <div class="mb-3">
+                        <label class="form-label">Customer</label>
+                        <input type="text" class="form-control" id="paymentCustomerName" readonly>
+                        <input type="hidden" id="paymentCustomerId">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Total Due Amount</label>
+                        <input type="text" class="form-control" id="paymentTotalDue" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Payment Amount *</label>
+                        <input type="number" class="form-control" id="paymentAmount" step="0.01" min="0.01" required>
+                        <div class="form-text">Enter the amount to collect from customer</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Payment Method *</label>
+                        <select class="form-select" id="paymentMethod" required>
+                            <option value="cash">Cash</option>
+                            <option value="bank">Bank Transfer</option>
+                            <option value="check">Check</option>
+                            <option value="digital">Digital Payment</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes (Optional)</label>
+                        <textarea class="form-control" id="paymentNotes" rows="2" placeholder="Payment reference or notes..."></textarea>
+                    </div>
+                </div>
+                <div id="paymentResult" style="display: none;">
+                    <!-- Payment allocation results will be shown here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmPayment">
+                    <i class="fas fa-money-bill-wave"></i> Process Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Payment Modal -->
+<div class="modal fade" id="quickPaymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Quick Due Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Select Customer</label>
+                    <select class="form-select" id="quickCustomerSelect">
+                        <option value="">-- Select Customer --</option>
+                        {% for customer in customers %}
+                        {% if customer.total_due > 0 %}
+                        <option value="{{ customer.id }}" data-due="{{ customer.total_due }}">
+                            {{ customer.name }} - ৳{{ customer.total_due|floatformat:2 }} ({{ customer.phone }})
+                        </option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Payment Amount *</label>
+                    <input type="number" class="form-control" id="quickPaymentAmount" step="0.01" min="0.01" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Payment Method *</label>
+                    <select class="form-select" id="quickPaymentMethod" required>
+                        <option value="cash">Cash</option>
+                        <option value="bank">Bank Transfer</option>
+                        <option value="check">Check</option>
+                        <option value="digital">Digital Payment</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Notes (Optional)</label>
+                    <textarea class="form-control" id="quickPaymentNotes" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmQuickPayment">
+                    <i class="fas fa-bolt"></i> Quick Pay
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Due Details Modal -->
+<div class="modal fade" id="dueDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Customer Due Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="dueDetailsContent">
+                    <!-- Due details will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Payment modal functions
+function showPaymentModal(customerId, customerName, totalDue) {
+    document.getElementById('paymentCustomerId').value = customerId;
+    document.getElementById('paymentCustomerName').value = customerName;
+    document.getElementById('paymentTotalDue').value = '৳' + parseFloat(totalDue).toFixed(2);
+    document.getElementById('paymentAmount').value = parseFloat(totalDue).toFixed(2);
+    document.getElementById('paymentAmount').max = totalDue;
+    
+    // Reset form
+    document.getElementById('paymentForm').style.display = 'block';
+    document.getElementById('paymentResult').style.display = 'none';
+    document.getElementById('paymentMethod').value = 'cash';
+    document.getElementById('paymentNotes').value = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+    modal.show();
+    
+    // Focus on amount input
+    setTimeout(() => {
+        document.getElementById('paymentAmount').focus();
+        document.getElementById('paymentAmount').select();
+    }, 500);
+}
+
+function showQuickPaymentModal(customerId = null, customerName = null, totalDue = null) {
+    const modal = new bootstrap.Modal(document.getElementById('quickPaymentModal'));
+    
+    if (customerId) {
+        document.getElementById('quickCustomerSelect').value = customerId;
+        document.getElementById('quickPaymentAmount').value = parseFloat(totalDue).toFixed(2);
+    } else {
+        document.getElementById('quickCustomerSelect').value = '';
+        document.getElementById('quickPaymentAmount').value = '';
+    }
+    
+    document.getElementById('quickPaymentMethod').value = 'cash';
+    document.getElementById('quickPaymentNotes').value = '';
+    
+    modal.show();
+    
+    // Auto-fill amount when customer is selected
+    document.getElementById('quickCustomerSelect').addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const dueAmount = selectedOption.getAttribute('data-due');
+        if (dueAmount) {
+            document.getElementById('quickPaymentAmount').value = parseFloat(dueAmount).toFixed(2);
+        }
+    });
+}
+
+function viewDueDetails(customerId) {
+    showGlobalLoading(true);
+    
+    fetch(`/get-customer-due-details/${customerId}/`)
+        .then(response => response.json())
+        .then(data => {
+            showGlobalLoading(false);
+            if (data.success) {
+                const content = document.getElementById('dueDetailsContent');
+                let html = `
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6>Customer: ${data.customer.name}</h6>
+                            <p class="mb-1">Phone: ${data.customer.phone}</p>
+                            <p class="mb-1">Credit Limit: ৳${parseFloat(data.customer.credit_limit).toFixed(2)}</p>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <h4 class="text-danger">Total Due: ৳${parseFloat(data.customer.total_due).toFixed(2)}</h4>
+                            <p class="text-muted">${data.due_invoice_count} due invoices</p>
+                            <button class="btn btn-sm btn-success" onclick="showPaymentModal(${data.customer.id}, '${data.customer.name}', ${data.customer.total_due})">
+                                <i class="fas fa-money-bill-wave"></i> Collect Payment
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                if (data.due_invoices.length > 0) {
+                    html += `
+                        <h6>Due Invoices:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Invoice #</th>
+                                        <th>Date</th>
+                                        <th>Total Amount</th>
+                                        <th>Paid Amount</th>
+                                        <th>Due Amount</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    data.due_invoices.forEach(invoice => {
+                        html += `
+                            <tr>
+                                <td><strong>${invoice.invoice_number}</strong></td>
+                                <td>${invoice.sale_date}</td>
+                                <td>৳${parseFloat(invoice.total_amount).toFixed(2)}</td>
+                                <td>৳${parseFloat(invoice.paid_amount).toFixed(2)}</td>
+                                <td class="text-danger fw-bold">৳${parseFloat(invoice.remaining_due).toFixed(2)}</td>
+                                <td>
+                                    <span class="badge ${invoice.payment_status === 'partial' ? 'bg-warning' : 'bg-danger'}">
+                                        ${invoice.payment_status.toUpperCase()}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
+                            <h6 class="text-success">No Due Invoices</h6>
+                            <p class="text-muted">This customer has no outstanding dues.</p>
+                        </div>
+                    `;
+                }
+                
+                content.innerHTML = html;
+                const modal = new bootstrap.Modal(document.getElementById('dueDetailsModal'));
+                modal.show();
+            } else {
+                showNotification('Error loading customer details: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showGlobalLoading(false);
+            showNotification('Error loading customer details: ' + error, 'error');
+        });
+}
+
+// Payment processing
+document.getElementById('confirmPayment').addEventListener('click', processPayment);
+document.getElementById('confirmQuickPayment').addEventListener('click', processQuickPayment);
+
+function processPayment() {
+    const customerId = document.getElementById('paymentCustomerId').value;
+    const amount = parseFloat(document.getElementById('paymentAmount').value);
+    const paymentMethod = document.getElementById('paymentMethod').value;
+    const notes = document.getElementById('paymentNotes').value;
+    
+    processDuePayment(customerId, amount, paymentMethod, notes, 'confirmPayment', 'paymentModal');
+}
+
+function processQuickPayment() {
+    const customerId = document.getElementById('quickCustomerSelect').value;
+    const amount = parseFloat(document.getElementById('quickPaymentAmount').value);
+    const paymentMethod = document.getElementById('quickPaymentMethod').value;
+    const notes = document.getElementById('quickPaymentNotes').value;
+    
+    if (!customerId) {
+        showNotification('Please select a customer', 'error');
+        return;
+    }
+    
+    processDuePayment(customerId, amount, paymentMethod, notes, 'confirmQuickPayment', 'quickPaymentModal');
+}
+
+function processDuePayment(customerId, amount, paymentMethod, notes, buttonId, modalId) {
+    if (!amount || amount <= 0) {
+        showNotification('Please enter a valid payment amount', 'error');
+        return;
+    }
+
+    const btn = document.getElementById(buttonId);
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    btn.disabled = true;
+
+    showGlobalLoading(true);
+
+    fetch('{% url "process_due_payment" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            customer_id: customerId,
+            amount: amount,
+            payment_method: paymentMethod,
+            notes: notes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        showGlobalLoading(false);
+        if (data.success) {
+            // Show allocation details
+            let allocationHtml = '<div class="alert alert-success"><h6>Payment Allocation:</h6><ul class="mb-0">';
+            data.allocated_payments.forEach(allocation => {
+                allocationHtml += `<li>Invoice ${allocation.invoice_number}: ৳${allocation.allocated_amount.toFixed(2)} (Due: ৳${allocation.due_amount.toFixed(2)})</li>`;
+            });
+            allocationHtml += '</ul></div>';
+            
+            showNotification(data.message + ' Allocation details shown below.', 'success');
+            
+            // Update the modal to show allocation details
+            const paymentForm = document.getElementById('paymentForm');
+            const paymentResult = document.getElementById('paymentResult');
+            paymentForm.style.display = 'none';
+            paymentResult.innerHTML = allocationHtml;
+            paymentResult.style.display = 'block';
+            
+            // Update button to close modal
+            btn.innerHTML = '<i class="fas fa-check"></i> Close';
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-primary');
+            btn.onclick = function() {
+                bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
+                setTimeout(() => location.reload(), 500);
+            };
+        } else {
+            showNotification('Error: ' + data.message, 'error');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    })
+    .catch(error => {
+        showGlobalLoading(false);
+        showNotification('Error processing payment: ' + error, 'error');
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+// Quick filter buttons
+function applyQuickFilter(filterType) {
+    let url = '{% url "customer_due_report" %}?';
+    
+    switch(filterType) {
+        case 'with_due':
+            url += 'due_status=with_due';
+            break;
+        case 'without_due':
+            url += 'due_status=without_due';
+            break;
+        case 'high_due':
+            url += 'min_due=1000';
+            break;
+        default:
+            url = '{% url "customer_due_report" %}';
+    }
+    
+    window.location.href = url;
+}
+
+// New functions for due amount management
+function refreshDueAmounts() {
+    showGlobalLoading(true);
+    document.getElementById('dataStatusText').innerHTML = 'Refreshing customer due amounts...';
+    
+    fetch('{% url "refresh_all_due_amounts" %}')
+        .then(response => response.json())
+        .then(data => {
+            showGlobalLoading(false);
+            if (data.success) {
+                showNotification(data.message, 'success');
+                document.getElementById('dataStatusText').innerHTML = 'Customer due amounts refreshed successfully.';
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification('Error: ' + data.message, 'error');
+                document.getElementById('dataStatusText').innerHTML = 'Error refreshing due amounts.';
+            }
+        })
+        .catch(error => {
+            showGlobalLoading(false);
+            showNotification('Error refreshing due amounts: ' + error, 'error');
+            document.getElementById('dataStatusText').innerHTML = 'Error refreshing due amounts.';
+        });
+}
+
+function forceUpdateAllDueAmounts() {
+    if (!confirm('This will force update due amounts for ALL customers. This might take a while. Continue?')) {
+        return;
+    }
+    
+    showGlobalLoading(true);
+    document.getElementById('dataStatusText').innerHTML = 'Force updating all customer due amounts...';
+    
+    fetch('{% url "force_update_all_due_amounts" %}')
+        .then(response => response.json())
+        .then(data => {
+            showGlobalLoading(false);
+            if (data.success) {
+                showNotification(data.message, 'success');
+                document.getElementById('dataStatusText').innerHTML = 'All customer due amounts force updated successfully.';
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showNotification('Error: ' + data.message, 'error');
+                document.getElementById('dataStatusText').innerHTML = 'Error force updating due amounts.';
+            }
+        })
+        .catch(error => {
+            showGlobalLoading(false);
+            showNotification('Error force updating due amounts: ' + error, 'error');
+            document.getElementById('dataStatusText').innerHTML = 'Error force updating due amounts.';
+        });
+}
+
+// Auto-refresh data status every 30 seconds
+setInterval(() => {
+    const statusElement = document.getElementById('dataStatusText');
+    if (statusElement) {
+        const currentText = statusElement.innerHTML;
+        if (!currentText.includes('refreshing') && !currentText.includes('Error')) {
+            statusElement.innerHTML = 'Customer due amounts are automatically updated. Use refresh button if data seems outdated.';
+        }
+    }
+}, 30000);
+</script>
+{% endblock %}

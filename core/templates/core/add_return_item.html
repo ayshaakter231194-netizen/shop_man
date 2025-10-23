@@ -1,0 +1,483 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Add Return Item - Shop Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-plus"></i> Add Return Item
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'purchase_return_detail' purchase_return.id %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Return
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cube"></i> Add Item to Return
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="returnItemForm">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <!-- Purchase Order Item -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.purchase_order_item.id_for_label }}" class="form-label">
+                                Product <span class="text-danger">*</span>
+                            </label>
+                            {{ form.purchase_order_item }}
+                            {% if form.purchase_order_item.errors %}
+                                <div class="text-danger small">{{ form.purchase_order_item.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Batch -->
+                        <div class="col-md-6 mb-3">
+                            <label for="batchSelect" class="form-label">
+                                Batch (Optional)
+                            </label>
+                            <select id="batchSelect" class="form-select">
+                                <option value="">Select Batch (Optional)</option>
+                            </select>
+                            {{ form.batch_selection }}
+                            {% if form.batch_selection.errors %}
+                                <div class="text-danger small">
+                                    {% for error in form.batch_selection.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Select a batch if you want to return from specific batch
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Quantity -->
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.quantity.id_for_label }}" class="form-label">
+                                Quantity <span class="text-danger">*</span>
+                            </label>
+                            {{ form.quantity }}
+                            {% if form.quantity.errors %}
+                                <div class="text-danger small">{{ form.quantity.errors }}</div>
+                            {% endif %}
+                            <div class="form-text" id="maxQuantityText">
+                                Maximum available: <span id="maxQuantity">0</span>
+                            </div>
+                        </div>
+
+                        <!-- Unit Cost -->
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.unit_cost.id_for_label }}" class="form-label">
+                                Unit Cost <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">৳</span>
+                                {{ form.unit_cost }}
+                            </div>
+                            {% if form.unit_cost.errors %}
+                                <div class="text-danger small">{{ form.unit_cost.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Reason -->
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.reason.id_for_label }}" class="form-label">
+                                Reason <span class="text-danger">*</span>
+                            </label>
+                            {{ form.reason }}
+                            {% if form.reason.errors %}
+                                <div class="text-danger small">{{ form.reason.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-3">
+                        <label for="{{ form.notes.id_for_label }}" class="form-label">
+                            Notes
+                        </label>
+                        {{ form.notes }}
+                        {% if form.notes.errors %}
+                            <div class="text-danger small">{{ form.notes.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-save"></i> Add Item
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="{% url 'purchase_return_detail' purchase_return.id %}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Return Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> Return Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Return Number:</strong> {{ purchase_return.return_number }}</p>
+                <p><strong>Purchase Order:</strong> PO-{{ purchase_return.purchase_order.po_number }}</p>
+                <p><strong>Supplier:</strong> {{ purchase_return.purchase_order.supplier.name }}</p>
+                <p><strong>Status:</strong> 
+                    <span class="badge 
+                        {% if purchase_return.status == 'pending' %}bg-warning
+                        {% elif purchase_return.status == 'approved' %}bg-info
+                        {% elif purchase_return.status == 'completed' %}bg-success
+                        {% else %}bg-secondary{% endif %}">
+                        {{ purchase_return.get_status_display }}
+                    </span>
+                </p>
+                <p><strong>Current Items:</strong> {{ purchase_return.items.count }}</p>
+                <p><strong>Current Total:</strong> ৳{{ purchase_return.return_amount|floatformat:2 }}</p>
+            </div>
+        </div>
+
+        <!-- Available Items -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-boxes"></i> Available Items
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    {% for item in form.purchase_order_item.field.queryset %}
+                    <div class="list-group-item px-0">
+                        <h6 class="mb-1">{{ item.product.name }}</h6>
+                        <small class="text-muted">
+                            Ordered: {{ item.quantity }} | 
+                            Available: {{ item.remaining_quantity }} | 
+                            Cost: ৳{{ item.unit_cost|floatformat:2 }}
+                        </small>
+                        {% if item.batch_number %}
+                        <div class="mt-1">
+                            <small class="text-info">
+                                <i class="fas fa-tag"></i> Batch: {{ item.batch_number }}
+                            </small>
+                        </div>
+                        {% endif %}
+                        {% if item.product.has_expiry %}
+                        <div class="mt-1">
+                            <small class="text-info">
+                                <i class="fas fa-calendar-alt"></i> Product has expiry tracking
+                            </small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted">
+                        <i class="fas fa-exclamation-circle fa-2x mb-2"></i>
+                        <p>No items available for return</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data for JavaScript -->
+<div id="poItemsData" data-items="{{ po_items_data }}" style="display: none;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const poItemSelect = document.getElementById('{{ form.purchase_order_item.id_for_label }}');
+    const batchSelect = document.getElementById('batchSelect');
+    const batchHiddenInput = document.getElementById('{{ form.batch_selection.id_for_label }}');
+    const quantityInput = document.getElementById('{{ form.quantity.id_for_label }}');
+    const unitCostInput = document.getElementById('{{ form.unit_cost.id_for_label }}');
+    const maxQuantitySpan = document.getElementById('maxQuantity');
+    const returnItemForm = document.getElementById('returnItemForm');
+    
+    // Get PO items data from hidden div
+    const poItemsDataElement = document.getElementById('poItemsData');
+    let poItemsData = [];
+    let poItemsMap = {};
+    
+    try {
+        if (poItemsDataElement) {
+            const dataText = poItemsDataElement.getAttribute('data-items');
+            if (dataText && dataText !== 'None' && dataText !== '') {
+                poItemsData = JSON.parse(dataText);
+                // Create a mapping of PO item ID to its data
+                poItemsData.forEach(item => {
+                    poItemsMap[item.id] = item;
+                });
+                console.log('Loaded PO items data:', poItemsMap);
+            } else {
+                console.warn('No PO items data found');
+            }
+        }
+    } catch (error) {
+        console.error('Error parsing PO items data:', error);
+    }
+
+    // Function to update batches based on selected purchase order item
+    function updateBatches(poItemId) {
+        if (!poItemId) {
+            batchSelect.innerHTML = '<option value="">Select Batch (Optional)</option>';
+            batchSelect.disabled = false;
+            batchHiddenInput.value = '';
+            return;
+        }
+
+        // Show loading
+        batchSelect.innerHTML = '<option value="">Loading batches...</option>';
+        batchSelect.disabled = true;
+        batchHiddenInput.value = '';
+        
+        // Fetch batches for this purchase order item
+        fetch(`/get-batches-for-po-item/${poItemId}/`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(batches => {
+                batchSelect.innerHTML = '<option value="">Select Batch (Optional)</option>';
+                batchSelect.disabled = false;
+                
+                if (batches && batches.length === 0) {
+                    const option = document.createElement('option');
+                    option.value = "";
+                    option.textContent = "No batches available for this item";
+                    batchSelect.appendChild(option);
+                } else if (batches) {
+                    batches.forEach(batch => {
+                        const option = document.createElement('option');
+                        option.value = batch.id;
+                        const expiryText = batch.expiry_date ? `Exp: ${batch.expiry_date}` : 'No expiry';
+                        option.textContent = `${batch.batch_number} (${batch.current_quantity} units) - ${expiryText}`;
+                        option.dataset.quantity = batch.current_quantity;
+                        batchSelect.appendChild(option);
+                    });
+                }
+                console.log('Loaded batches:', batches);
+            })
+            .catch(error => {
+                console.error('Error fetching batches:', error);
+                batchSelect.innerHTML = '<option value="">Error loading batches</option>';
+                batchSelect.disabled = false;
+            });
+    }
+
+    // Update hidden field when batch selection changes
+    batchSelect.addEventListener('change', function() {
+        console.log('Batch changed:', this.value);
+        batchHiddenInput.value = this.value;
+        
+        // Update max quantity logic
+        if (this.value && this.value !== '') {
+            const selectedOption = this.options[this.selectedIndex];
+            const batchQty = parseInt(selectedOption.dataset.quantity || 0);
+            
+            // Also get the PO item max quantity
+            const poSelected = poItemSelect.options[poItemSelect.selectedIndex];
+            const poItemId = poSelected.value;
+            const poItemData = poItemsMap[poItemId];
+            const poMaxQty = poItemData ? poItemData.remaining_quantity : 0;
+            
+            // Use the minimum of batch quantity and PO item remaining quantity
+            const maxQty = Math.min(batchQty, poMaxQty);
+            
+            maxQuantitySpan.textContent = maxQty;
+            quantityInput.setAttribute('max', maxQty);
+            
+            // Update quantity if it exceeds new max
+            const currentQty = parseInt(quantityInput.value) || 0;
+            if (currentQty > maxQty) {
+                quantityInput.value = maxQty;
+            }
+            
+            console.log('Updated max quantity to:', maxQty);
+        } else {
+            // Reset to PO item max quantity when no batch selected
+            const poSelected = poItemSelect.options[poItemSelect.selectedIndex];
+            if (poSelected && poSelected.value) {
+                const poItemId = poSelected.value;
+                const poItemData = poItemsMap[poItemId];
+                if (poItemData) {
+                    const maxQty = poItemData.remaining_quantity;
+                    maxQuantitySpan.textContent = maxQty;
+                    quantityInput.setAttribute('max', maxQty);
+                    console.log('Reset to PO max quantity:', maxQty);
+                }
+            }
+        }
+    });
+
+    // Update form when PO item changes
+    poItemSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        console.log('PO Item changed:', selectedOption ? selectedOption.value : 'none');
+        
+        if (selectedOption && selectedOption.value) {
+            const poItemId = selectedOption.value;
+            const poItemData = poItemsMap[poItemId];
+            
+            if (poItemData) {
+                console.log('Found PO item data:', poItemData);
+                // Update batches for this specific purchase order item
+                updateBatches(poItemId);
+                
+                // Update max quantity and unit cost
+                maxQuantitySpan.textContent = poItemData.remaining_quantity;
+                quantityInput.setAttribute('max', poItemData.remaining_quantity);
+                unitCostInput.value = poItemData.unit_cost;
+                
+                // Reset quantity and enable fields
+                quantityInput.value = '';
+                quantityInput.disabled = false;
+                unitCostInput.disabled = false;
+            } else {
+                console.warn('No data found for PO item:', poItemId);
+                // Reset fields if no data found
+                resetFormFields();
+            }
+        } else {
+            // Reset fields if no item selected
+            resetFormFields();
+        }
+    });
+
+    // Validate quantity on input
+    quantityInput.addEventListener('input', function() {
+        const maxQty = parseInt(this.getAttribute('max')) || 0;
+        const currentQty = parseInt(this.value) || 0;
+        
+        if (currentQty > maxQty) {
+            this.setCustomValidity(`Quantity cannot exceed ${maxQty}`);
+        } else {
+            this.setCustomValidity('');
+        }
+    });
+
+    // Validate form before submission
+    returnItemForm.addEventListener('submit', function(e) {
+        let isValid = true;
+        
+        // Validate purchase order item is selected
+        if (!poItemSelect.value) {
+            alert('Please select a product.');
+            poItemSelect.focus();
+            isValid = false;
+        }
+        
+        // Validate quantity
+        const quantity = parseInt(quantityInput.value) || 0;
+        const maxQty = parseInt(quantityInput.getAttribute('max')) || 0;
+        if (quantity <= 0) {
+            alert('Please enter a valid quantity.');
+            quantityInput.focus();
+            isValid = false;
+        } else if (quantity > maxQty) {
+            alert(`Quantity cannot exceed ${maxQty}.`);
+            quantityInput.focus();
+            isValid = false;
+        }
+        
+        // Validate unit cost
+        const unitCost = parseFloat(unitCostInput.value) || 0;
+        if (unitCost <= 0) {
+            alert('Please enter a valid unit cost.');
+            unitCostInput.focus();
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+        }
+        
+        return isValid;
+    });
+
+    // Helper function to reset form fields
+    function resetFormFields() {
+        batchSelect.innerHTML = '<option value="">Select Batch (Optional)</option>';
+        batchSelect.disabled = false;
+        batchHiddenInput.value = '';
+        maxQuantitySpan.textContent = '0';
+        quantityInput.setAttribute('max', '0');
+        unitCostInput.value = '';
+        quantityInput.value = '';
+        quantityInput.disabled = true;
+        unitCostInput.disabled = true;
+    }
+
+    // Initialize the form
+    function initializeForm() {
+        console.log('Initializing form...');
+        
+        // Enable batch select
+        batchSelect.disabled = false;
+        
+        if (poItemSelect.options.length > 0) {
+            // Try to find the first valid option (skip empty ones)
+            let foundValidOption = false;
+            for (let i = 0; i < poItemSelect.options.length; i++) {
+                if (poItemSelect.options[i].value && poItemSelect.options[i].value !== '') {
+                    poItemSelect.selectedIndex = i;
+                    console.log('Selected initial option:', poItemSelect.options[i].value);
+                    
+                    // Trigger change event after a short delay to ensure DOM is ready
+                    setTimeout(() => {
+                        poItemSelect.dispatchEvent(new Event('change'));
+                    }, 100);
+                    
+                    foundValidOption = true;
+                    break;
+                }
+            }
+            
+            if (!foundValidOption) {
+                console.warn('No valid options found in PO item select');
+                resetFormFields();
+            }
+        } else {
+            console.warn('No options found in PO item select');
+            resetFormFields();
+        }
+    }
+
+    // Initialize when DOM is ready
+    initializeForm();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,895 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Stock Adjustment - Shop Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-exchange-alt"></i> Stock Adjustment
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'product_list' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Products
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-edit"></i> Adjust Stock Level
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="stockAdjustmentForm">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <!-- Product Selection -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.product.id_for_label }}" class="form-label">
+                                Product <span class="text-danger">*</span>
+                            </label>
+                            {{ form.product }}
+                            {% if form.product.errors %}
+                                <div class="text-danger small">{{ form.product.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Adjustment Type -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.adjustment_type.id_for_label }}" class="form-label">
+                                Adjustment Type <span class="text-danger">*</span>
+                            </label>
+                            {{ form.adjustment_type }}
+                            {% if form.adjustment_type.errors %}
+                                <div class="text-danger small">{{ form.adjustment_type.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Current Stock Info -->
+                    <div class="row mb-3" id="currentStockInfo" style="display: none;">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <strong>Current Stock:</strong>
+                                        <span id="currentStockValue" class="badge bg-primary fs-6">0</span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Min Stock Level:</strong>
+                                        <span id="minStockValue" class="badge bg-secondary fs-6">0</span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Status:</strong>
+                                        <span id="stockStatus" class="badge bg-success fs-6">In Stock</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Batch Selection Section (for removal and optional addition) -->
+                    <div class="row mb-3" id="batchSelectionSection" style="display: none;">
+                        <div class="col-12">
+                            <label for="{{ form.batch.id_for_label }}" class="form-label">
+                                Select Batch
+                                <small class="text-muted">(choose existing batch — required for removal; optional for add)</small>
+                            </label>
+                            {{ form.batch }}
+                            {% if form.batch.errors %}
+                                <div class="text-danger small">{{ form.batch.errors }}</div>
+                            {% endif %}
+                            <div class="form-text">
+                                Select which batch to operate on. Only batches with available stock are shown.
+                            </div>
+
+                            <!-- Batch Info Display -->
+                            <div class="card mt-2" id="batchInfo" style="display: none;">
+                                <div class="card-body py-2">
+                                    <small>
+                                        <strong>Batch:</strong> <span id="batchNumber">-</span><br>
+                                        <strong>Available Quantity:</strong> <span id="batchQuantity">0</span> units<br>
+                                        <strong>Expiry Date:</strong> <span id="batchExpiry">-</span>
+                                        <span id="batchExpiryStatus" class="badge ms-1"></span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New Batch Creation Section (for addition) -->
+                    <div class="row mb-3" id="newBatchSection" style="display: none;">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-plus-circle"></i> Create New Batch (Optional)
+                                        <small class="text-muted">- Leave empty to add to an existing batch or to add without batch tracking</small>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="{{ form.new_batch_number.id_for_label }}" class="form-label">
+                                                Batch Number
+                                            </label>
+                                            {{ form.new_batch_number }}
+                                            {% if form.new_batch_number.errors %}
+                                                <div class="text-danger small">{{ form.new_batch_number.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text">
+                                                Enter a unique batch number (optional)
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="{{ form.new_manufacture_date.id_for_label }}" class="form-label">
+                                                Manufacture Date
+                                            </label>
+                                            {{ form.new_manufacture_date }}
+                                            {% if form.new_manufacture_date.errors %}
+                                                <div class="text-danger small">{{ form.new_manufacture_date.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="{{ form.new_expiry_date.id_for_label }}" class="form-label">
+                                                Expiry Date
+                                            </label>
+                                            {{ form.new_expiry_date }}
+                                            {% if form.new_expiry_date.errors %}
+                                                <div class="text-danger small">{{ form.new_expiry_date.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text">
+                                                Required when creating a new batch for products with expiry tracking
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <div class="alert alert-light mt-4">
+                                                <small>
+                                                    <i class="fas fa-info-circle"></i>
+                                                    <strong>Note:</strong> If you don't specify batch details, 
+                                                    the stock will be added to the selected existing batch or without batch tracking.
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Quantity -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.quantity.id_for_label }}" class="form-label">
+                                Quantity <span class="text-danger">*</span>
+                            </label>
+                            {{ form.quantity }}
+                            {% if form.quantity.errors %}
+                                <div class="text-danger small">{{ form.quantity.errors }}</div>
+                            {% endif %}
+                            <div class="form-text" id="quantityHelp">
+                                Enter the quantity for adjustment
+                            </div>
+                        </div>
+
+                        <!-- New Stock Level Preview -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">New Stock Level</label>
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h3 id="newStockLevel" class="mb-0 text-primary">0</h3>
+                                    <small class="text-muted">After adjustment</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reason -->
+                    <div class="mb-3">
+                        <label for="{{ form.reason.id_for_label }}" class="form-label">
+                            Reason for Adjustment <span class="text-danger">*</span>
+                        </label>
+                        {{ form.reason }}
+                        {% if form.reason.errors %}
+                            <div class="text-danger small">{{ form.reason.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">
+                            Please provide a clear reason for this stock adjustment
+                        </div>
+                    </div>
+
+                    <!-- Adjustment Summary -->
+                    <div class="card mb-4" id="adjustmentSummary" style="display: none;">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-list-alt"></i> Adjustment Summary
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <div class="border rounded p-3">
+                                        <small class="text-muted d-block">Current Stock</small>
+                                        <strong id="summaryCurrent" class="fs-4">0</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="border rounded p-3">
+                                        <small class="text-muted d-block">Adjustment</small>
+                                        <strong id="summaryAdjustment" class="fs-4 text-warning">+0</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="border rounded p-3 bg-light">
+                                        <small class="text-muted d-block">New Stock</small>
+                                        <strong id="summaryNew" class="fs-4 text-success">0</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3" id="batchSummary" style="display: none;">
+                                <div class="col-12">
+                                    <div class="alert alert-warning mb-0">
+                                        <small>
+                                            <i class="fas fa-info-circle"></i>
+                                            <strong>Batch Operation:</strong> 
+                                            <span id="batchOperationText">This adjustment will affect batch stock</span>
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <button type="submit" class="btn btn-success w-100" id="submitBtn">
+                                <i class="fas fa-check-circle"></i> Apply Adjustment
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="{% url 'product_list' %}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Quick Actions -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-bolt"></i> Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-primary" onclick="setQuickAdjustment('add', 10)">
+                        <i class="fas fa-plus"></i> Add 10 Units
+                    </button>
+                    <button type="button" class="btn btn-outline-warning" onclick="setQuickAdjustment('remove', 5)">
+                        <i class="fas fa-minus"></i> Remove 5 Units
+                    </button>
+                    <button type="button" class="btn btn-outline-info" onclick="setQuickAdjustment('correction', 0)">
+                        <i class="fas fa-sync"></i> Stock Correction
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Card -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-question-circle"></i> How It Works
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6 class="text-success">
+                        <i class="fas fa-plus-circle"></i> Add Stock
+                    </h6>
+                    <small class="text-muted">
+                        <strong>With Batch:</strong> Create a new batch with batch number and expiry date or choose an existing batch to add into.<br>
+                        <strong>Without Batch:</strong> Add stock without specific batch tracking
+                    </small>
+                </div>
+                <div class="mb-3">
+                    <h6 class="text-danger">
+                        <i class="fas fa-minus-circle"></i> Remove Stock
+                    </h6>
+                    <small class="text-muted">
+                        <strong>Must select a batch</strong> to remove from<br>
+                        Only batches with available stock are shown
+                    </small>
+                </div>
+                <div class="mb-3">
+                    <h6 class="text-info">
+                        <i class="fas fa-sync-alt"></i> Stock Correction
+                    </h6>
+                    <small class="text-muted">
+                        Set the exact stock quantity. No batch operations.
+                    </small>
+                </div>
+
+                <div class="alert alert-warning mt-3">
+                    <small>
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Important:</strong> All adjustments are logged and cannot be undone.
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Adjustments -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-history"></i> Recent Adjustments
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if recent_adjustments %}
+                    {% for adjustment in recent_adjustments %}
+                    <div class="border-bottom pb-2 mb-2">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ adjustment.product.name }}</strong>
+                            <span class="badge {% if adjustment.adjustment_type == 'add' %}bg-success{% elif adjustment.adjustment_type == 'remove' %}bg-danger{% else %}bg-info{% endif %}">
+                                {{ adjustment.get_adjustment_type_display }}
+                            </span>
+                        </div>
+                        <small class="text-muted">
+                            {{ adjustment.quantity }} units • 
+                            {% if adjustment.batch %}
+                                Batch: {{ adjustment.batch.batch_number }} •
+                            {% endif %}
+                            {{ adjustment.adjusted_at|timesince }} ago
+                        </small>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center mb-0">No recent adjustments</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ------------------------------
+   Data initialization (from context)
+   ------------------------------ */
+let productsData = {};
+let batchesData = {};
+
+function initializeProductData() {
+    // Build productsData and batchesData from Django `products` context
+    {% for product in products %}
+    productsData["{{ product.id }}"] = {
+        id: {{ product.id }},
+        name: "{{ product.name|escapejs }}",
+        currentStock: {{ product.current_stock|default:0 }},
+        minStock: {{ product.min_stock_level|default:0 }},
+        sellingPrice: {{ product.selling_price|default:0 }},
+        costPrice: {{ product.cost_price|default:0 }},
+        hasExpiry: {{ product.has_expiry|yesno:"true,false" }},
+        batches: [
+            {% for batch in product.batches.all %}
+            {
+                id: "{{ batch.id }}",
+                batchNumber: "{{ batch.batch_number|escapejs }}",
+                quantity: {{ batch.quantity|default:0 }},
+                currentQuantity: {{ batch.current_quantity|default:0 }},
+                expiryDate: {% if batch.expiry_date %}"{{ batch.expiry_date|date:'Y-m-d' }}"{% else %}null{% endif %},
+                manufactureDate: {% if batch.manufacture_date %}"{{ batch.manufacture_date|date:'Y-m-d' }}"{% else %}null{% endif %},
+                isExpired: {{ batch.is_expired|yesno:"true,false" }},
+                isNearExpiry: {{ batch.is_near_expiry|yesno:"true,false" }},
+                daysUntilExpiry: {{ batch.days_until_expiry|default:"null" }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    };
+    {% endfor %}
+
+    // Build batch lookup
+    batchesData = {};
+    for (const pid in productsData) {
+        const p = productsData[pid];
+        (p.batches || []).forEach(b => {
+            batchesData[String(b.id)] = Object.assign({}, b, { productId: String(pid) });
+        });
+    }
+}
+
+/* ------------------------------
+   Update available batches in <select>
+   ------------------------------ */
+function updateAvailableBatches() {
+    const productSelect = document.getElementById('id_product');
+    const batchSelect = document.getElementById('id_batch');
+    if (!productSelect || !batchSelect) return;
+
+    const productId = String(productSelect.value);
+    batchSelect.innerHTML = ''; // clear
+
+    // Add default placeholder option
+    const placeholder = document.createElement('option');
+    placeholder.value = "";
+    placeholder.textContent = "Select a batch";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    batchSelect.appendChild(placeholder);
+
+    if (!productId || !productsData[productId]) {
+        // No product selected -> show helpful option
+        const opt = document.createElement('option');
+        opt.value = "";
+        opt.textContent = "Select a product first";
+        opt.disabled = true;
+        batchSelect.innerHTML = '';
+        batchSelect.appendChild(opt);
+        return;
+    }
+
+    const product = productsData[productId];
+    let any = false;
+    // Add batches with currentQuantity > 0
+    (product.batches || []).forEach(b => {
+        if ((b.currentQuantity || 0) > 0) {
+            any = true;
+            const option = document.createElement('option');
+            option.value = b.id;
+            option.textContent = `${b.batchNumber} (${b.currentQuantity} available)` + (b.expiryDate ? ` - Exp: ${new Date(b.expiryDate).toLocaleDateString()}` : '');
+            batchSelect.appendChild(option);
+        }
+    });
+
+    if (!any) {
+        const opt = document.createElement('option');
+        opt.value = "";
+        opt.textContent = "No batches available for this product";
+        opt.disabled = true;
+        batchSelect.appendChild(opt);
+    }
+
+    // Trigger change so batch info updates
+    batchSelect.dispatchEvent(new Event('change'));
+}
+
+/* ------------------------------
+   Show/hide sections depending on adjustment type
+   - For 'remove': batchSelection required
+   - For 'add': show both existing batches (optional) and newBatchSection
+   - For 'correction': hide batch/new batch
+   ------------------------------ */
+function updateBatchSections() {
+    const typeEl = document.getElementById('id_adjustment_type');
+    const productEl = document.getElementById('id_product');
+    const batchSection = document.getElementById('batchSelectionSection');
+    const newBatchSection = document.getElementById('newBatchSection');
+    const batchSelect = document.getElementById('id_batch');
+
+    if (!typeEl) return;
+    const adjustmentType = typeEl.value;
+
+    if (adjustmentType === 'remove' || adjustmentType === 'expiry_writeoff' || adjustmentType === 'damage_writeoff') {
+        if (batchSection) batchSection.style.display = 'block';
+        if (newBatchSection) newBatchSection.style.display = 'none';
+        if (batchSelect) batchSelect.required = true;
+        // refresh batches for product
+        if (productEl && productEl.value) setTimeout(updateAvailableBatches, 0);
+    } else if (adjustmentType === 'add') {
+        // allow choosing existing batch (optional) and also allow creating a new batch
+        if (batchSection) batchSection.style.display = 'block';
+        if (newBatchSection) newBatchSection.style.display = 'block';
+        if (batchSelect) batchSelect.required = false;
+        if (productEl && productEl.value) setTimeout(updateAvailableBatches, 0);
+    } else {
+        // correction or others - hide both sections
+        if (batchSection) batchSection.style.display = 'none';
+        if (newBatchSection) newBatchSection.style.display = 'none';
+        if (batchSelect) batchSelect.required = false;
+    }
+}
+
+/* ------------------------------
+   Update batch info card when a batch is selected
+   ------------------------------ */
+function updateBatchInfo() {
+    const batchSelect = document.getElementById('id_batch');
+    const batchInfo = document.getElementById('batchInfo');
+    if (!batchSelect) return;
+    const batchId = String(batchSelect.value || "");
+    if (!batchId || !batchesData[batchId]) {
+        if (batchInfo) batchInfo.style.display = 'none';
+        return;
+    }
+    const batch = batchesData[batchId];
+    document.getElementById('batchNumber').textContent = batch.batchNumber || '-';
+    document.getElementById('batchQuantity').textContent = batch.currentQuantity ?? 0;
+    document.getElementById('batchExpiry').textContent = batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString() : 'Not set';
+
+    const expiryStatusElement = document.getElementById('batchExpiryStatus');
+    if (batch.isExpired) {
+        expiryStatusElement.textContent = 'Expired';
+        expiryStatusElement.className = 'badge bg-danger';
+    } else if (batch.isNearExpiry) {
+        expiryStatusElement.textContent = 'Near Expiry';
+        expiryStatusElement.className = 'badge bg-warning';
+    } else if (batch.expiryDate) {
+        expiryStatusElement.textContent = 'Valid';
+        expiryStatusElement.className = 'badge bg-success';
+    } else {
+        expiryStatusElement.textContent = 'No Expiry';
+        expiryStatusElement.className = 'badge bg-secondary';
+    }
+
+    if (batchInfo) batchInfo.style.display = 'block';
+}
+
+/* ------------------------------
+   Update product info and new stock preview
+   ------------------------------ */
+function updateProductInfo() {
+    const productEl = document.getElementById('id_product');
+    const adjTypeEl = document.getElementById('id_adjustment_type');
+    const quantityEl = document.getElementById('id_quantity');
+
+    if (!productEl || !adjTypeEl || !quantityEl) return;
+
+    const productId = String(productEl.value || "");
+    const adjustmentType = adjTypeEl.value;
+    const quantity = parseInt(quantityEl.value || '0', 10) || 0;
+
+    if (!productId || !productsData[productId]) {
+        document.getElementById('currentStockInfo').style.display = 'none';
+        document.getElementById('batchSelectionSection').style.display = 'none';
+        document.getElementById('newBatchSection').style.display = 'none';
+        document.getElementById('newStockLevel').textContent = '0';
+        document.getElementById('adjustmentSummary').style.display = 'none';
+        return;
+    }
+
+    const product = productsData[productId];
+    const currentStock = product.currentStock ?? 0;
+
+    // show current stock
+    const currentStockInfo = document.getElementById('currentStockInfo');
+    if (currentStockInfo) currentStockInfo.style.display = 'block';
+    document.getElementById('currentStockValue').textContent = currentStock;
+    document.getElementById('minStockValue').textContent = product.minStock ?? 0;
+
+    const statusElement = document.getElementById('stockStatus');
+    if (currentStock === 0) {
+        statusElement.textContent = 'Out of Stock';
+        statusElement.className = 'badge bg-danger fs-6';
+    } else if (currentStock <= (product.minStock || 0)) {
+        statusElement.textContent = 'Low Stock';
+        statusElement.className = 'badge bg-warning fs-6';
+    } else {
+        statusElement.textContent = 'In Stock';
+        statusElement.className = 'badge bg-success fs-6';
+    }
+
+    // new stock calculation
+    let newStock = currentStock;
+    if (adjustmentType === 'add') {
+        newStock = currentStock + quantity;
+    } else if (adjustmentType === 'remove') {
+        newStock = currentStock - quantity;
+    } else if (adjustmentType === 'correction') {
+        newStock = quantity;
+    }
+
+    const newStockEl = document.getElementById('newStockLevel');
+    newStockEl.textContent = newStock;
+    if (newStock === 0) {
+        newStockEl.className = 'mb-0 text-danger';
+    } else if (newStock <= (product.minStock || 0)) {
+        newStockEl.className = 'mb-0 text-warning';
+    } else {
+        newStockEl.className = 'mb-0 text-success';
+    }
+
+    // update batch sections and batch options
+    updateBatchSections();
+
+    // update summary
+    updateAdjustmentSummary(currentStock, quantity, newStock, adjustmentType);
+}
+
+/* ------------------------------
+   Update adjustment summary (shows batch operation text)
+   ------------------------------ */
+function updateAdjustmentSummary(current, adjustment, newStock, type) {
+    const adjustmentSummary = document.getElementById('adjustmentSummary');
+    if (!adjustmentSummary) return;
+    adjustmentSummary.style.display = 'block';
+    document.getElementById('summaryCurrent').textContent = current;
+    document.getElementById('summaryNew').textContent = newStock;
+
+    const adjustmentElement = document.getElementById('summaryAdjustment');
+    const batchSummary = document.getElementById('batchSummary');
+    const batchOperationText = document.getElementById('batchOperationText');
+
+    if (type === 'add') {
+        adjustmentElement.textContent = '+' + adjustment;
+        adjustmentElement.className = 'fs-4 text-success';
+        const newBatchNumber = document.getElementById('id_new_batch_number')?.value;
+        if (newBatchNumber && batchSummary && batchOperationText) {
+            batchSummary.style.display = 'block';
+            batchOperationText.textContent = `Creating new batch: ${newBatchNumber}`;
+        } else if (batchSummary) {
+            batchSummary.style.display = 'none';
+        }
+    } else if (type === 'remove') {
+        adjustmentElement.textContent = '-' + adjustment;
+        adjustmentElement.className = 'fs-4 text-danger';
+        const batchId = document.getElementById('id_batch')?.value;
+        if (batchId && batchesData[batchId] && batchSummary && batchOperationText) {
+            const batch = batchesData[batchId];
+            const remaining = (batch.currentQuantity || 0) - adjustment;
+            batchSummary.style.display = 'block';
+            batchOperationText.textContent = `Removing from batch: ${batch.batchNumber}. Remaining: ${remaining} units`;
+        } else if (batchSummary) {
+            batchSummary.style.display = 'none';
+        }
+    } else {
+        adjustmentElement.textContent = '=' + adjustment;
+        adjustmentElement.className = 'fs-4 text-info';
+        if (batchSummary) batchSummary.style.display = 'none';
+    }
+}
+
+/* ------------------------------
+   Quick adjustment helper
+   ------------------------------ */
+function setQuickAdjustment(type, quantity) {
+    const adjEl = document.getElementById('id_adjustment_type');
+    const qtyEl = document.getElementById('id_quantity');
+    const reasonEl = document.getElementById('id_reason');
+
+    if (adjEl) adjEl.value = type;
+    if (qtyEl) qtyEl.value = quantity;
+    if (reasonEl && !reasonEl.value) {
+        if (type === 'add') reasonEl.value = 'Quick stock addition';
+        else if (type === 'remove') reasonEl.value = 'Quick stock reduction';
+        else reasonEl.value = 'Stock count correction';
+    }
+
+    // re-evaluate UI
+    updateQuantityHelp();
+    updateProductInfo();
+}
+
+/* ------------------------------
+   Quantity helper text
+   ------------------------------ */
+function updateQuantityHelp() {
+    const type = document.getElementById('id_adjustment_type')?.value;
+    const helpElement = document.getElementById('quantityHelp');
+    if (!helpElement) return;
+    if (type === 'add') helpElement.textContent = 'Enter quantity to add to current stock';
+    else if (type === 'remove') helpElement.textContent = 'Enter quantity to remove from current stock';
+    else helpElement.textContent = 'Enter the exact stock quantity after correction';
+}
+
+/* ------------------------------
+   Client-side form validation
+   ------------------------------ */
+function validateForm() {
+    const productId = document.getElementById('id_product')?.value;
+    const adjustmentType = document.getElementById('id_adjustment_type')?.value;
+    const quantity = parseInt(document.getElementById('id_quantity')?.value || '0', 10) || 0;
+    const reason = document.getElementById('id_reason')?.value || '';
+    const batchId = document.getElementById('id_batch')?.value;
+    const newBatchNumber = document.getElementById('id_new_batch_number')?.value;
+    const newExpiryDate = document.getElementById('id_new_expiry_date')?.value;
+
+    if (!productId) { alert('Please select a product'); return false; }
+    if (!adjustmentType) { alert('Please select an adjustment type'); return false; }
+    if (quantity <= 0) { alert('Please enter a valid quantity greater than 0'); return false; }
+    if (!reason.trim()) { alert('Please provide a reason for this adjustment'); return false; }
+
+    const product = productsData[String(productId)];
+    if (!product) { alert('Invalid product selected'); return false; }
+
+    if (adjustmentType === 'remove' && !batchId) {
+        alert('Please select a batch for stock removal'); return false;
+    }
+
+    if (adjustmentType === 'add' && newBatchNumber && product.hasExpiry && !newExpiryDate) {
+        alert('Expiry date is required when creating a new batch for products with expiry tracking');
+        return false;
+    }
+
+    // check batch quantity for removal
+    if (adjustmentType === 'remove') {
+        const batch = batchesData[String(batchId)];
+        if (batch && quantity > (batch.currentQuantity || 0)) {
+            return confirm(`Warning: You are trying to remove ${quantity} units from batch ${batch.batchNumber}, but only ${batch.currentQuantity} are available. Continue?`);
+        }
+    }
+
+    // check negative product stock
+    const currentStock = product.currentStock || 0;
+    let newStock = currentStock;
+    if (adjustmentType === 'remove') newStock = currentStock - quantity;
+    else if (adjustmentType === 'add') newStock = currentStock + quantity;
+    else if (adjustmentType === 'correction') newStock = quantity;
+
+    if (newStock < 0) {
+        return confirm('Warning: This adjustment will result in negative stock. Are you sure you want to continue?');
+    }
+
+    return true;
+}
+
+/* ------------------------------
+   Debug helper (temporary)
+   ------------------------------ */
+function debugInfo() {
+    console.log('Products:', productsData);
+    console.log('Batches:', batchesData);
+    console.log('Selected product:', document.getElementById('id_product')?.value);
+    console.log('Selected batch:', document.getElementById('id_batch')?.value);
+}
+
+/* ------------------------------
+   DOMContentLoaded initialization
+   ------------------------------ */
+document.addEventListener('DOMContentLoaded', function() {
+    initializeProductData();
+
+    // Element references
+    const productEl = document.getElementById('id_product');
+    const adjustTypeEl = document.getElementById('id_adjustment_type');
+    const qtyEl = document.getElementById('id_quantity');
+    const batchEl = document.getElementById('id_batch');
+    const newBatchEl = document.getElementById('id_new_batch_number');
+    const newExpiryEl = document.getElementById('id_new_expiry_date');
+
+    // safe bindings
+    if (productEl) {
+        productEl.addEventListener('change', function() {
+            updateAvailableBatches();
+            updateProductInfo();
+        });
+    }
+    if (adjustTypeEl) {
+        adjustTypeEl.addEventListener('change', function() {
+            updateQuantityHelp();
+            updateBatchSections();
+            updateProductInfo();
+        });
+    }
+    if (qtyEl) {
+        qtyEl.addEventListener('input', updateProductInfo);
+    }
+    if (batchEl) {
+        batchEl.addEventListener('change', function() {
+            updateBatchInfo();
+            updateProductInfo();
+        });
+    }
+    if (newBatchEl) newBatchEl.addEventListener('input', updateProductInfo);
+    if (newExpiryEl) newExpiryEl.addEventListener('change', updateProductInfo);
+
+    // form submit validation
+    const form = document.getElementById('stockAdjustmentForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!validateForm()) e.preventDefault();
+        });
+    }
+
+    // initial UI setup
+    updateQuantityHelp();
+    updateBatchSections();
+    updateAvailableBatches();
+    updateProductInfo();
+
+    // debug button (remove in production)
+    const debugBtn = document.createElement('button');
+    debugBtn.type = 'button';
+    debugBtn.className = 'btn btn-sm btn-outline-secondary position-fixed';
+    debugBtn.style.bottom = '10px';
+    debugBtn.style.right = '10px';
+    debugBtn.style.zIndex = '1000';
+    debugBtn.textContent = 'Debug';
+    debugBtn.onclick = debugInfo;
+    document.body.appendChild(debugBtn);
+});
+</script>
+
+<style>
+.form-label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+    border-radius: 0.375rem;
+    border: 1px solid #dee2e6;
+    padding: 0.5rem 0.75rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.btn {
+    border-radius: 0.375rem;
+    font-weight: 500;
+}
+
+#newStockLevel {
+    font-weight: bold;
+    transition: color 0.3s ease;
+}
+
+.alert {
+    border: none;
+    border-radius: 0.375rem;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+#batchInfo {
+    background-color: #f8f9fa;
+    border-left: 4px solid #0d6efd;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem;
+    }
+
+    .row {
+        margin-left: -0.5rem;
+        margin-right: -0.5rem;
+    }
+
+    .col-md-6, .col-md-4, .col-12 {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+}
+</style>
+{% endblock %}
