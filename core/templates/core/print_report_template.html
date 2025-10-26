@@ -134,10 +134,32 @@
         .alert {
             margin: 20px 0;
         }
+        
+        .payment-status {
+            font-size: 9px;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        
+        .status-paid {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-partial {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-due {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
     </style>
 </head>
 <body>
-    {% load humanize %}  <!-- ADD THIS LINE -->
+    {% load humanize %}
+    {% load custom_filters %}  <!-- Use your existing custom_filters -->
     
     <!-- Print Button (visible only on screen) -->
     <div class="print-btn no-print">
@@ -244,6 +266,51 @@
             <h4>৳{{ average_sale|floatformat:2|intcomma }}</h4>
             <small>Per transaction</small>
         </div>
+        
+        <!-- New Payment Summary Cards -->
+        <div class="summary-card">
+            <small>Total Paid</small>
+            <h4 class="text-success">৳{{ total_actual_paid|floatformat:2|intcomma }}</h4>
+            <small>Actual cash collected</small>
+        </div>
+        
+        <div class="summary-card">
+            <small>Total Due</small>
+            <h4 class="text-danger">৳{{ total_due_amount|floatformat:2|intcomma }}</h4>
+            <small>Outstanding</small>
+        </div>
+    </div>
+
+    <!-- Payment Summary -->
+    <div class="card">
+        <div class="card-header">
+            <h4>Payment Summary</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <p><strong>Total Sales Amount:</strong> ৳{{ gross_sales|floatformat:2|intcomma }}</p>
+                    <p><strong>Total Returns:</strong> -৳{{ total_returns|floatformat:2|intcomma }}</p>
+                    <p><strong>Net Sales Amount:</strong> ৳{{ net_sales|floatformat:2|intcomma }}</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Total Actual Paid:</strong> ৳{{ total_actual_paid|floatformat:2|intcomma }}</p>
+                    <p><strong>Total Due Amount:</strong> ৳{{ total_due_amount|floatformat:2|intcomma }}</p>
+                    <p><strong>Collection Rate:</strong> 
+                        {% if net_sales > 0 %}
+                            {{ collection_rate|floatformat:1 }}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Fully Paid Transactions:</strong> {{ fully_paid_count }}</p>
+                    <p><strong>Partial Paid Transactions:</strong> {{ partial_paid_count }}</p>
+                    <p><strong>Unpaid Transactions:</strong> {{ unpaid_count }}</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Returns Summary (if include_returns) -->
@@ -261,7 +328,7 @@
                 <div class="col-md-6">
                     <p><strong>Return Rate:</strong> 
                         {% if gross_sales > 0 %}
-                            {{ total_returns|floatformat:2 }}{% widthratio total_returns gross_sales 100 %}%
+                            {{ return_rate|floatformat:1 }}%
                         {% else %}
                             0%
                         {% endif %}
@@ -291,12 +358,22 @@
                             <th class="text-end">Gross Amount</th>
                             <th class="text-end">Returns</th>
                             <th class="text-end">Net Amount</th>
+                            <!-- NEW COLUMNS -->
+                            <th class="text-end">Paid Amount</th>
+                            <th class="text-end">Change Amount</th>
+                            <th class="text-end">Actual Paid</th>
+                            <th class="text-end">Due Amount</th>
+                            <th class="text-center">Payment Status</th>
+                            <!-- END NEW COLUMNS -->
                             <th class="text-center">Time</th>
                             <th class="text-center">Sold By</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for sale in sales %}
+                        {% with paid_amount=sale.paid_amount|default:0 change_amount=sale.change_amount|default:0 net_amount=sale.net_amount|default:0 %}
+                        {% with actual_paid=paid_amount|subtract:change_amount %}
+                        {% with due_amount=net_amount|subtract:actual_paid %}
                         <tr>
                             <td>
                                 <strong>#{{ sale.invoice_number }}</strong>
@@ -334,6 +411,47 @@
                             <td class="text-end">
                                 <strong>৳{{ sale.net_amount|floatformat:2|intcomma }}</strong>
                             </td>
+                            
+                            <!-- NEW COLUMNS DATA -->
+                            <td class="text-end">
+                                {% if sale.paid_amount > 0 %}
+                                ৳{{ sale.paid_amount|floatformat:2|intcomma }}
+                                {% else %}
+                                <span>-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if sale.change_amount > 0 %}
+                                <span class="text-info">-৳{{ sale.change_amount|floatformat:2|intcomma }}</span>
+                                {% else %}
+                                <span>-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if actual_paid > 0 %}
+                                <span class="text-success">৳{{ actual_paid|floatformat:2|intcomma }}</span>
+                                {% else %}
+                                <span>-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if due_amount > 0 %}
+                                <span class="text-danger">৳{{ due_amount|floatformat:2|intcomma }}</span>
+                                {% else %}
+                                <span>-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if due_amount <= 0 %}
+                                <span class="payment-status status-paid">Paid</span>
+                                {% elif actual_paid > 0 and due_amount > 0 %}
+                                <span class="payment-status status-partial">Partial</span>
+                                {% else %}
+                                <span class="payment-status status-due">Due</span>
+                                {% endif %}
+                            </td>
+                            <!-- END NEW COLUMNS DATA -->
+                            
                             <td class="text-center">
                                 <small>{{ sale.sale_date|date:"h:i A" }}</small>
                             </td>
@@ -341,6 +459,9 @@
                                 <span class="badge bg-secondary">{{ sale.sold_by.username }}</span>
                             </td>
                         </tr>
+                        {% endwith %}
+                        {% endwith %}
+                        {% endwith %}
                         {% endfor %}
                     </tbody>
                     <tfoot>
@@ -349,7 +470,13 @@
                             <td class="text-end"><strong>৳{{ gross_sales|floatformat:2|intcomma }}</strong></td>
                             <td class="text-end"><strong class="text-danger">-৳{{ total_returns|floatformat:2|intcomma }}</strong></td>
                             <td class="text-end"><strong>৳{{ net_sales|floatformat:2|intcomma }}</strong></td>
-                            <td colspan="2"></td>
+                            <!-- NEW FOOTER TOTALS -->
+                            <td class="text-end"><strong>৳{{ total_paid_amount|floatformat:2|intcomma }}</strong></td>
+                            <td class="text-end"><strong class="text-info">-৳{{ total_change_amount|floatformat:2|intcomma }}</strong></td>
+                            <td class="text-end"><strong class="text-success">৳{{ total_actual_paid|floatformat:2|intcomma }}</strong></td>
+                            <td class="text-end"><strong class="text-danger">৳{{ total_due_amount|floatformat:2|intcomma }}</strong></td>
+                            <td colspan="3"></td>
+                            <!-- END NEW FOOTER TOTALS -->
                         </tr>
                     </tfoot>
                 </table>

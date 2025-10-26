@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 import uuid
 from django.db.models import Sum
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 
@@ -38,7 +38,7 @@ class Product(models.Model):
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     sku = models.CharField(max_length=50, unique=True)
-    barcode = models.CharField(max_length=100, unique=True, null=True, blank=True, verbose_name="Barcode Number")  # NEW FIELD
+    barcode = models.CharField(max_length=100, unique=True, null=True, blank=True, verbose_name="Barcode Number")
     description = models.TextField(blank=True)
     cost_price = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -52,9 +52,9 @@ class Product(models.Model):
     class Meta:
         ordering = ['name']
         indexes = [
-            models.Index(fields=['barcode']),  # NEW INDEX for faster barcode lookups
+            models.Index(fields=['barcode']),
             models.Index(fields=['sku']),
-            models.Index(fields=['supplier']),  # NEW INDEX for supplier filtering
+            models.Index(fields=['supplier']),
         ]
 
     def __str__(self):
@@ -65,7 +65,6 @@ class Product(models.Model):
         if self.selling_price < self.cost_price:
             raise ValidationError('Selling price cannot be less than cost price.')
         
-        # NEW: Validate barcode format (optional)
         if self.barcode and len(self.barcode) < 3:
             raise ValidationError('Barcode must be at least 3 characters long.')
     
@@ -106,11 +105,9 @@ class Product(models.Model):
             return ((self.selling_price - self.cost_price) / self.cost_price) * 100
         return 0
     
-    # NEW METHOD: Generate barcode if not provided
     def generate_barcode(self):
         """Generate a unique barcode if not provided"""
         if not self.barcode:
-            # Use SKU as base or generate unique barcode
             base_barcode = self.sku.replace('SKU-', 'BC-')
             counter = 1
             new_barcode = base_barcode
@@ -121,7 +118,6 @@ class Product(models.Model):
             
             self.barcode = new_barcode
     
-    # NEW METHOD: Find product by barcode
     @classmethod
     def find_by_barcode(cls, barcode):
         """Find product by barcode number"""
@@ -130,9 +126,7 @@ class Product(models.Model):
         except cls.DoesNotExist:
             return None
     
-    # Override save to auto-generate barcode if needed
     def save(self, *args, **kwargs):
-        # Generate barcode if not provided and SKU exists
         if not self.barcode and self.sku:
             self.generate_barcode()
         super().save(*args, **kwargs)
@@ -150,14 +144,11 @@ class ProductBatch(models.Model):
     class Meta:
         verbose_name_plural = "Product Batches"
         ordering = ['expiry_date']
-        unique_together = ('product', 'batch_number')  # prevent duplicate batch numbers for the same product
+        unique_together = ('product', 'batch_number')
 
     def __str__(self):
         return f"{self.product.name} - Batch: {self.batch_number}"
 
-    # -----------------
-    # VALIDATION
-    # -----------------
     def clean(self):
         """Validate batch data"""
         if self.expiry_date and self.manufacture_date:
@@ -167,19 +158,12 @@ class ProductBatch(models.Model):
         if self.current_quantity > self.quantity:
             raise ValidationError('Current quantity cannot exceed original quantity.')
 
-    # -----------------
-    # SAVE OVERRIDE
-    # -----------------
     def save(self, *args, **kwargs):
-        # Automatically set current_quantity to quantity if not provided
         if self.current_quantity is None or self.current_quantity == 0:
             self.current_quantity = self.quantity
         self.full_clean()
         super().save(*args, **kwargs)
 
-    # -----------------
-    # PROPERTY HELPERS
-    # -----------------
     @property
     def is_expired(self):
         return bool(self.expiry_date and self.expiry_date < timezone.now().date())
@@ -188,7 +172,7 @@ class ProductBatch(models.Model):
     def is_near_expiry(self):
         if not self.expiry_date:
             return False
-        warning_days = getattr(self.product, 'expiry_warning_days', 30)  # fallback to 30 if not set
+        warning_days = getattr(self.product, 'expiry_warning_days', 30)
         warning_date = timezone.now().date() + timedelta(days=warning_days)
         return self.expiry_date <= warning_date and not self.is_expired
 
@@ -202,9 +186,6 @@ class ProductBatch(models.Model):
     def stock_value(self):
         return self.current_quantity * self.product.cost_price
 
-    # -----------------
-    # STOCK ADJUSTMENT HELPERS
-    # -----------------
     def add_stock(self, quantity):
         """Increase stock for this batch"""
         if quantity < 0:
@@ -231,7 +212,7 @@ class PurchaseOrder(models.Model):
         ('returned', 'Partially Returned'),
     )
 
-    po_number = models.CharField(max_length=50, unique=True, default=uuid.uuid4)
+    po_number = models.CharField(max_length=50, unique=True)
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
     order_date = models.DateTimeField(default=timezone.now)
     expected_date = models.DateTimeField(default=timezone.now)
@@ -250,6 +231,38 @@ class PurchaseOrder(models.Model):
         if self.expected_date <= self.order_date:
             raise ValidationError('Expected date must be after order date.')
     
+    def save(self, *args, **kwargs):
+        if not self.po_number:
+            self.po_number = self.generate_po_number()
+        super().save(*args, **kwargs)
+    
+    def generate_po_number(self):
+        """Generate PO number in format YYMMDDXXX (without PO- prefix)"""
+        date_str = timezone.now().strftime('%y%m%d')  # YYMMDD format
+        
+        # Get the last PO number for today
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_pos = PurchaseOrder.objects.filter(created_at__gte=today_start)
+        
+        if today_pos.exists():
+            last_po = today_pos.order_by('-created_at').first()
+            # Extract just the numeric part for comparison
+            last_po_number = last_po.po_number
+            if last_po_number.startswith(date_str):
+                try:
+                    last_seq = int(last_po_number[6:])  # Extract sequence after YYMMDD
+                    new_seq = last_seq + 1
+                except (ValueError, IndexError):
+                    new_seq = 1
+            else:
+                new_seq = 1
+        else:
+            new_seq = 1
+        
+        # Format: YYMMDDXXX (9 digits total)
+        po_number = f"{date_str}{new_seq:03d}"
+        return po_number
+    
     @property
     def returned_amount(self):
         return self.returns.aggregate(total=Sum('return_amount'))['total'] or 0
@@ -264,12 +277,10 @@ class PurchaseOrder(models.Model):
         for item in self.items.all():
             product = item.product
             
-            # Use the batch number from PurchaseOrderItem if provided
             batch_number = item.batch_number
             if not batch_number:
                 batch_number = f"BATCH-{timezone.now().strftime('%Y%m%d')}-{item.id}"
             
-            # Create batch
             batch = ProductBatch.objects.create(
                 product=product,
                 batch_number=batch_number,
@@ -285,22 +296,18 @@ class PurchaseOrder(models.Model):
     
     @property
     def has_returns(self):
-        """Check if this purchase order has any returns"""
         return self.returns.exists()
     
     @property 
     def total_returned_amount(self):
-        """Get total amount returned for this purchase order"""
         return self.returns.aggregate(total=Sum('return_amount'))['total'] or 0
     
     @property
     def net_amount(self):
-        """Get net amount after returns"""
         return self.total_amount - self.total_returned_amount
     
     @property
     def return_status(self):
-        """Get return status for display"""
         if not self.has_returns:
             return 'no_returns'
         
@@ -474,34 +481,25 @@ class Customer(models.Model):
         return self.total_due < self.credit_limit
 
     def update_due_amount(self):
-        """Recalculate total due from unpaid sales - DEBUG VERSION"""
+        """Recalculate total due from unpaid sales"""
         from django.db.models import Sum, F
         from decimal import Decimal
         
         try:
-            print(f"DEBUG: Updating due amount for customer {self.name} (ID: {self.id})")
-            
             # Calculate total due from sales where paid_amount < total_amount
             due_sales = Sale.objects.filter(
                 customer=self,
                 payment_status__in=['due', 'partial']
             )
             
-            print(f"DEBUG: Found {due_sales.count()} due sales")
-            
             total_due = due_sales.aggregate(
                 total_due=Sum(F('total_amount') - F('paid_amount'))
             )['total_due'] or Decimal('0')
-            
-            print(f"DEBUG: Calculated total due: {total_due}, Current total_due: {self.total_due}")
             
             # Update the customer's total_due field
             if self.total_due != total_due:
                 self.total_due = total_due
                 self.save(update_fields=['total_due', 'updated_at'])
-                print(f"DEBUG: Updated customer total_due to {total_due}")
-            else:
-                print(f"DEBUG: No change needed - total_due already correct")
                 
         except Exception as e:
             print(f"Error updating customer due amount: {e}")
@@ -585,7 +583,7 @@ class Customer(models.Model):
                 payment_method=payment_method,
                 notes=notes,
                 received_by=received_by,
-                allocated_details=allocated_payments  # Store allocation details
+                allocated_details=allocated_payments
             )
             
             # Update customer total_due
@@ -595,10 +593,9 @@ class Customer(models.Model):
 
 
 class Sale(models.Model):
-    invoice_number = models.CharField(max_length=50, unique=True, default=uuid.uuid4)
+    invoice_number = models.CharField(max_length=50, unique=True)
     customer_name = models.CharField(max_length=200, blank=True)
     customer_phone = models.CharField(max_length=20, blank=True)
-    # Add customer foreign key
     customer = models.ForeignKey('Customer', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales')
     sale_date = models.DateTimeField(default=timezone.now)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -609,7 +606,6 @@ class Sale(models.Model):
     change_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     returned_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     
-    # NEW: Payment status field
     payment_status = models.CharField(
         max_length=20, 
         choices=[('paid', 'Paid'), ('due', 'Due'), ('partial', 'Partial')],
@@ -628,7 +624,10 @@ class Sale(models.Model):
         return f"Invoice-{self.invoice_number}"
     
     def save(self, *args, **kwargs):
-        # FIRST: Link to customer if phone number exists
+        if not self.invoice_number:
+            self.invoice_number = self.generate_invoice_number()
+            
+        # Link to customer if phone number exists
         if self.customer_phone and not self.customer:
             try:
                 customer = Customer.objects.get(phone=self.customer_phone)
@@ -654,7 +653,7 @@ class Sale(models.Model):
             except Sale.DoesNotExist:
                 pass
 
-        # THEN: Update payment status based on paid amount
+        # Update payment status based on paid amount
         if self.paid_amount >= self.total_amount:
             self.payment_status = 'paid'
             self.change_amount = self.paid_amount - self.total_amount
@@ -667,7 +666,7 @@ class Sale(models.Model):
 
         super().save(*args, **kwargs)
 
-        # FINALLY: Update customer due amounts
+        # Update customer due amounts
         try:
             # Update current customer
             if self.customer:
@@ -684,8 +683,56 @@ class Sale(models.Model):
         except Exception as e:
             print(f"Error updating customer due amounts: {e}")
 
+    def generate_invoice_number(self):
+        """Generate invoice number in format YYMMDDXXX (without INV- prefix)"""
+        date_str = timezone.now().strftime('%y%m%d')  # YYMMDD format
+        
+        # Get the last invoice number for today
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_sales = Sale.objects.filter(created_at__gte=today_start)
+        
+        if today_sales.exists():
+            last_sale = today_sales.order_by('-created_at').first()
+            # Extract just the numeric part for comparison
+            last_invoice_number = last_sale.invoice_number
+            if last_invoice_number.startswith(date_str):
+                try:
+                    last_seq = int(last_invoice_number[6:])  # Extract sequence after YYMMDD
+                    new_seq = last_seq + 1
+                except (ValueError, IndexError):
+                    new_seq = 1
+            else:
+                new_seq = 1
+        else:
+            new_seq = 1
+        
+        # Format: YYMMDDXXX (9 digits total)
+        invoice_number = f"{date_str}{new_seq:03d}"
+        return invoice_number
+    
+    @property
+    def paid(self):
+        """Calculate actual amount paid by customer (paid_amount - change_amount)"""
+        paid_amount = self.paid_amount
+        change_amount = self.change_amount
+        
+        # Convert to Decimal if they are floats
+        if isinstance(paid_amount, float):
+            paid_amount = Decimal(str(paid_amount))
+        if isinstance(change_amount, float):
+            change_amount = Decimal(str(change_amount))
+            
+        # Calculate actual paid amount (money kept by the business)
+        actual_paid = paid_amount - change_amount
+        
+        # Ensure it's not negative and doesn't exceed total_amount
+        return max(Decimal('0'), min(actual_paid, self.total_amount))
 
-
+    @property
+    def remaining_due(self):
+        """Get remaining due amount"""
+        return max(Decimal('0'), self.total_amount - self.paid)
+    
     def get_total_items(self):
         return self.items.aggregate(total_items=Sum('quantity'))['total_items'] or 0
 
@@ -745,12 +792,16 @@ class Sale(models.Model):
                 total += item.quantity
         return total
 
-    # Add this method for admin display
     def profit_display(self):
         """Display profit in admin"""
         profit = self.get_profit()
         return f"${profit:.2f}" if profit else "-"
     profit_display.short_description = 'Profit'
+
+    def paid_display(self):
+        """Display paid amount in admin"""
+        return f"${self.paid:.2f}"
+    paid_display.short_description = 'Paid Amount'
 
     def get_net_cost(self):
         """Calculate total cost after accounting for returns"""
@@ -788,9 +839,6 @@ class Sale(models.Model):
     def remaining_due(self):
         """Get remaining due amount"""
         return max(Decimal('0'), self.total_amount - self.paid_amount)
-    
-
-
 
 
 class SaleItem(models.Model):
@@ -824,6 +872,7 @@ class SaleItem(models.Model):
             cost_price = Decimal(str(cost_price))
             
         return (unit_price - cost_price) * Decimal(str(self.quantity))
+    
     @property
     def returned_quantity(self):
         """Get total quantity returned for this sale item"""
@@ -876,7 +925,7 @@ class UserProfile(models.Model):
     def has_view_permission(self, view_code):
         """Check if user has permission for a specific view"""
         if self.can_access_admin:
-            return True  # Admin users have access to everything
+            return True
         
         return self.user.view_permissions.filter(
             permission__view_code=view_code
@@ -900,8 +949,8 @@ class SupplierBill(models.Model):
         ('partial', 'Partially Paid'),
         ('paid', 'Paid'),
         ('overdue', 'Overdue'),
-        ('returned', 'Returned'),  # ADD THIS
-        ('partially_returned', 'Partially Returned'),  # ADD THIS
+        ('returned', 'Returned'),
+        ('partially_returned', 'Partially Returned'),
     )
     
     bill_number = models.CharField(max_length=50, unique=True, default=uuid.uuid4)
@@ -928,30 +977,40 @@ class SupplierBill(models.Model):
             raise ValidationError('Due date must be after bill date.')
     
     def save(self, *args, **kwargs):
-        # Calculate due amount before saving
-        self.due_amount = self.total_amount - self.paid_amount
-        
-        # Check if there are returns first
+        # Calculate due amount considering returns
         purchase_order = self.purchase_order
         total_returned = purchase_order.total_returned_amount
         
+        # Calculate net amount after returns
+        net_amount = self.total_amount - total_returned
+        
+        # Calculate due amount based on net amount
+        self.due_amount = max(Decimal('0'), net_amount - self.paid_amount)
+        
+        # Update status based on returns and payments
         if total_returned > 0:
             if total_returned >= self.total_amount:
                 self.status = 'returned'
+                self.due_amount = Decimal('0')
             else:
                 self.status = 'partially_returned'
         else:
             # Auto-update status based on payment
-            if self.paid_amount >= self.total_amount:
+            if self.paid_amount >= net_amount:
                 self.status = 'paid'
+                self.due_amount = Decimal('0')
             elif self.paid_amount > 0:
                 self.status = 'partial'
             else:
                 self.status = 'pending'
                 
             # Check if overdue
-            if self.due_amount > 0 and timezone.now() > self.due_date:
-                self.status = 'overdue'
+            if self.due_amount > 0:
+                due_date = self.due_date.date() if hasattr(self.due_date, 'date') else self.due_date
+                today = timezone.now().date()
+                
+                if due_date < today:
+                    self.status = 'overdue'
             
         super().save(*args, **kwargs)
     
@@ -963,17 +1022,64 @@ class SupplierBill(models.Model):
     @property
     def net_amount(self):
         """Get net amount after returns"""
-        return self.total_amount - self.returned_amount
+        return max(Decimal('0'), self.total_amount - self.returned_amount)
+    
+    @property
+    def effective_due_amount(self):
+        """Get the actual due amount considering returns"""
+        return max(Decimal('0'), self.net_amount - self.paid_amount)
     
     @property
     def paid_percentage(self):
-        if self.total_amount > 0:
-            return (self.paid_amount / self.total_amount) * 100
+        """Calculate paid percentage based on net amount (after returns)"""
+        if self.net_amount > 0:
+            return (self.paid_amount / self.net_amount) * 100
         return 0
     
     @property
     def is_overdue(self):
-        return self.status == 'overdue'
+        """Check if bill is overdue (due date passed and has due amount)"""
+        if self.effective_due_amount <= 0:
+            return False
+            
+        due_date = self.due_date.date() if hasattr(self.due_date, 'date') else self.due_date
+        today = timezone.now().date()
+        
+        return due_date < today
+    
+    @property
+    def days_overdue(self):
+        """Get number of days overdue"""
+        if not self.is_overdue:
+            return 0
+            
+        due_date = self.due_date.date() if hasattr(self.due_date, 'date') else self.due_date
+        today = timezone.now().date()
+        return (today - due_date).days
+    
+    @property
+    def payment_progress(self):
+        """Get payment progress information"""
+        return {
+            'paid': float(self.paid_amount),
+            'due': float(self.effective_due_amount),
+            'total': float(self.net_amount),
+            'percentage': float(self.paid_percentage)
+        }
+    
+    @property
+    def can_accept_payment(self):
+        """Check if this bill can accept payments"""
+        return (self.effective_due_amount > 0 and 
+                self.status not in ['returned', 'paid'])
+    
+    @property
+    def payment_status_display(self):
+        """Get enhanced status display with overdue info"""
+        display = self.get_status_display()
+        if self.is_overdue:
+            return f"{display} ({self.days_overdue} days overdue)"
+        return display
 
 class Payment(models.Model):
     PAYMENT_METHODS = (
@@ -999,18 +1105,17 @@ class Payment(models.Model):
         return f"Payment-{self.id} for BILL-{self.bill.bill_number}"
     
     def clean(self):
-        # Only validate if bill is set
         if not self.bill_id:
             return
             
         if self.amount <= 0:
             raise ValidationError('Payment amount must be positive.')
         
-        # Get fresh bill instance to ensure we have current due_amount
         try:
             bill = SupplierBill.objects.get(id=self.bill_id)
-            if self.amount > bill.due_amount:
-                raise ValidationError(f'Payment amount cannot exceed due amount (৳{bill.due_amount}).')
+            # Use effective due amount for validation
+            if self.amount > bill.effective_due_amount:
+                raise ValidationError(f'Payment amount cannot exceed due amount (৳{bill.effective_due_amount}).')
         except SupplierBill.DoesNotExist:
             raise ValidationError('Associated bill does not exist.')
 
@@ -1034,7 +1139,6 @@ class Payment(models.Model):
             # Bill was deleted, nothing to update
             pass
 
-# New model for stock movement tracking
 class StockMovement(models.Model):
     MOVEMENT_TYPES = (
         ('purchase_in', 'Purchase In'),
@@ -1060,7 +1164,6 @@ class StockMovement(models.Model):
     def __str__(self):
         return f"{self.movement_type} - {self.product.name}"
 
-# Sale Return Models
 class SaleReturn(models.Model):
     RETURN_REASONS = [
         ('defective', 'Defective Product'),
@@ -1219,39 +1322,6 @@ class SaleReturnItem(models.Model):
             cost_price = Decimal(str(cost_price))
         return self.quantity * cost_price
 
-# Signals
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-
-@receiver(post_save, sender=PurchaseOrder)
-def create_supplier_bill(sender, instance, created, **kwargs):
-    if instance.status == 'completed':
-        if not SupplierBill.objects.filter(purchase_order=instance).exists():
-            SupplierBill.objects.create(
-                purchase_order=instance,
-                supplier=instance.supplier,
-                total_amount=instance.total_amount,
-                due_date=instance.expected_date + timedelta(days=30),
-                created_by=instance.created_by
-            )
-
-@receiver(post_save, sender=PurchaseOrderItem)
-def create_product_batches(sender, instance, created, **kwargs):
-    if created and instance.purchase_order.status == 'completed':
-        product = instance.product
-        batch_number = instance.batch_number or f"BATCH-{uuid.uuid4().hex[:8].upper()}"
-        
-        ProductBatch.objects.create(
-            product=product,
-            batch_number=batch_number,
-            expiry_date=instance.expiry_date if product.has_expiry else None,
-            quantity=instance.quantity,
-            current_quantity=instance.quantity,
-            purchase_order_item=instance
-        )
-
-
-
 class DuePayment(models.Model):
     PAYMENT_METHODS = (
         ('cash', 'Cash'),
@@ -1268,7 +1338,7 @@ class DuePayment(models.Model):
     notes = models.TextField(blank=True)
     received_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
-    allocated_details = models.JSONField(default=dict, blank=True, null=True)  # FIXED: Added null=True
+    allocated_details = models.JSONField(default=dict, blank=True, null=True)
     
     class Meta:
         ordering = ['-payment_date']
@@ -1278,9 +1348,8 @@ class DuePayment(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # Update customer due amount - FIXED VERSION
+        # Update customer due amount
         try:
-            # Refresh the customer instance to get latest data
             customer = Customer.objects.get(id=self.customer.id)
             customer.update_due_amount()
         except Exception as e:
@@ -1289,14 +1358,13 @@ class DuePayment(models.Model):
     def delete(self, *args, **kwargs):
         customer = self.customer
         super().delete(*args, **kwargs)
-        # Update customer due amount after deletion - FIXED VERSION
+        # Update customer due amount after deletion
         try:
             customer.refresh_from_db()
             customer.update_due_amount()
         except Exception as e:
             print(f"Error updating customer due amount in DuePayment.delete(): {e}")
 
-    # Add a property to display allocated details in a readable format
     @property
     def allocated_details_display(self):
         """Display allocated details in a readable format"""
@@ -1313,9 +1381,6 @@ class DuePayment(models.Model):
             return "; ".join(details)
         except (TypeError, KeyError):
             return "Error parsing allocation details"
-        
-
-
 
 class ViewPermission(models.Model):
     """Model to define which views users can access"""
@@ -1374,8 +1439,6 @@ class ViewPermission(models.Model):
     
     def __str__(self):
         return self.name
-    
-    #userview Persmission
 
 class UserViewPermission(models.Model):
     """Model to assign view permissions to users"""
@@ -1392,3 +1455,34 @@ class UserViewPermission(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.permission.name}"
+
+# Signals
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=PurchaseOrder)
+def create_supplier_bill(sender, instance, created, **kwargs):
+    if instance.status == 'completed':
+        if not SupplierBill.objects.filter(purchase_order=instance).exists():
+            SupplierBill.objects.create(
+                purchase_order=instance,
+                supplier=instance.supplier,
+                total_amount=instance.total_amount,
+                due_date=instance.expected_date + timedelta(days=30),
+                created_by=instance.created_by
+            )
+
+@receiver(post_save, sender=PurchaseOrderItem)
+def create_product_batches(sender, instance, created, **kwargs):
+    if created and instance.purchase_order.status == 'completed':
+        product = instance.product
+        batch_number = instance.batch_number or f"BATCH-{uuid.uuid4().hex[:8].upper()}"
+        
+        ProductBatch.objects.create(
+            product=product,
+            batch_number=batch_number,
+            expiry_date=instance.expiry_date if product.has_expiry else None,
+            quantity=instance.quantity,
+            current_quantity=instance.quantity,
+            purchase_order_item=instance
+        )

@@ -37,9 +37,7 @@ urlpatterns = [
     path('bill-dashboard/', views.bill_dashboard, name='bill_dashboard'),
     path('api/bill-summary/', views.bill_summary_api, name='bill_summary_api'),
     
-    # User Management
-    path('users/create/', views.create_user, name='create_user'),
-    path('users/<int:user_id>/edit/', views.edit_user, name='edit_user'),
+
 
     # Expiry and Returns Management
     path('expiry-report/', views.expiry_report, name='expiry_report'),

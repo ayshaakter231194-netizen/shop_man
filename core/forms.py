@@ -335,6 +335,11 @@ class PurchaseOrderForm(forms.ModelForm):
             }, format='%Y-%m-%d'),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make supplier required
+        self.fields['supplier'].required = True
+
     def clean_expected_date(self):
         expected_date = self.cleaned_data.get('expected_date')
         if expected_date:
@@ -344,7 +349,6 @@ class PurchaseOrderForm(forms.ModelForm):
             if expected_date < timezone.now().date():
                 raise forms.ValidationError("Expected date cannot be in the past.")
         return expected_date
-
 
 class PurchaseOrderItemForm(forms.ModelForm):
     class Meta:

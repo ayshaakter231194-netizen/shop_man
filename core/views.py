@@ -472,43 +472,70 @@ def generate_invoice(request, invoice_number):
 @login_required
 @view_permission_required('purchase_order_create')
 def purchase_order_create(request):
-    products = Product.objects.all().select_related('category')
+    products = Product.objects.all().select_related('category', 'supplier')
     suppliers = Supplier.objects.all()
 
     # Quick-add low stock
     quick_products = Product.objects.filter(current_stock__lte=F('min_stock_level'))[:5]
 
     if request.method == 'POST':
+        print("=" * 50)
+        print("DEBUG: POST request received")
+        print("DEBUG: POST data keys:", list(request.POST.keys()))
+        
         form = PurchaseOrderForm(request.POST)
         if form.is_valid():
+            print("DEBUG: Form is valid")
             purchase_order = form.save(commit=False)
             purchase_order.created_by = request.user
             
             # Set status to draft if draft button was clicked
-            if request.POST.get('draft'):
+            if 'draft' in request.POST:
                 purchase_order.status = 'draft'
+                print("DEBUG: Saving as draft")
             
             purchase_order.save()
+            print(f"DEBUG: Purchase order created with ID: {purchase_order.id}")
 
-            # Process items with batch numbers and expiry dates
+            # Process items from the form data
             items_data = []
             i = 0
-            while f'items[{i}].product' in request.POST:
-                product_id = request.POST.get(f'items[{i}].product')
-                quantity = request.POST.get(f'items[{i}].quantity')
-                unit_cost = request.POST.get(f'items[{i}].unit_cost')
-                batch_number = request.POST.get(f'items[{i}].batch_number', '')
-                expiry_date = request.POST.get(f'items[{i}].expiry_date', '')
+            
+            # Look for order_items in the format: order_items[0][product], order_items[0][quantity], etc.
+            while True:
+                product_key = f'order_items[{i}][product]'
+                if product_key not in request.POST:
+                    break
+                    
+                product_id = request.POST.get(product_key)
+                quantity = request.POST.get(f'order_items[{i}][quantity]')
+                unit_cost = request.POST.get(f'order_items[{i}][unit_cost]')
+                total_cost = request.POST.get(f'order_items[{i}][total_cost]')
+
+                print(f"DEBUG: Processing item {i}:")
+                print(f"  - product: {product_id}")
+                print(f"  - quantity: {quantity}")
+                print(f"  - unit_cost: {unit_cost}")
+                print(f"  - total_cost: {total_cost}")
 
                 if product_id and quantity and unit_cost:
-                    items_data.append({
-                        'product_id': product_id,
-                        'quantity': int(quantity),
-                        'unit_cost': float(unit_cost),
-                        'batch_number': batch_number,
-                        'expiry_date': expiry_date if expiry_date else None,
-                    })
+                    try:
+                        items_data.append({
+                            'product_id': int(product_id),
+                            'quantity': int(quantity),
+                            'unit_cost': float(unit_cost),
+                            'total_cost': float(total_cost),
+                        })
+                        print(f"DEBUG: ✅ Added item {i} to items_data")
+                    except (ValueError, TypeError) as e:
+                        print(f"❌ Error parsing item data: {e}")
+                        continue
+                else:
+                    print(f"❌ Missing data for item {i}")
                 i += 1
+
+            print(f"DEBUG: Total items found: {len(items_data)}")
+            print(f"DEBUG: Items data: {items_data}")
 
             if not items_data:
                 messages.error(request, 'Please add at least one item to the purchase order.')
@@ -522,40 +549,56 @@ def purchase_order_create(request):
                 return render(request, 'core/purchase_order_form.html', context)
 
             total_amount = 0
+            items_created = 0
+            
             for item_data in items_data:
-                product = Product.objects.get(id=item_data['product_id'])
-                total_cost = item_data['quantity'] * item_data['unit_cost']
-                
-                # Convert expiry_date string to date object if provided
-                expiry_date = None
-                if item_data['expiry_date']:
-                    try:
-                        expiry_date = datetime.strptime(item_data['expiry_date'], '%Y-%m-%d').date()
-                    except ValueError:
-                        expiry_date = None
-                
-                item = PurchaseOrderItem.objects.create(
-                    purchase_order=purchase_order,
-                    product=product,
-                    quantity=item_data['quantity'],
-                    unit_cost=item_data['unit_cost'],
-                    total_cost=total_cost,
-                    batch_number=item_data['batch_number'],
-                    expiry_date=expiry_date
-                )
-                total_amount += total_cost
+                try:
+                    product = Product.objects.get(id=item_data['product_id'])
+                    
+                    # Create purchase order item
+                    item = PurchaseOrderItem.objects.create(
+                        purchase_order=purchase_order,
+                        product=product,
+                        quantity=item_data['quantity'],
+                        unit_cost=item_data['unit_cost'],
+                        total_cost=item_data['total_cost']
+                    )
+                    total_amount += item_data['total_cost']
+                    items_created += 1
+                    print(f"DEBUG: ✅ Created PurchaseOrderItem: {product.name} - {item_data['quantity']} x {item_data['unit_cost']} = {item_data['total_cost']}")
+                    
+                except Product.DoesNotExist:
+                    print(f"❌ Product with id {item_data['product_id']} does not exist")
+                    messages.error(request, f"Product with ID {item_data['product_id']} not found.")
+                    continue
+                except Exception as e:
+                    print(f"❌ Error creating item: {e}")
+                    messages.error(request, f"Error creating item: {str(e)}")
+                    continue
+
+            if items_created == 0:
+                messages.error(request, 'No valid items were added to the purchase order.')
+                purchase_order.delete()
+                context = {
+                    'form': form,
+                    'products': products,
+                    'suppliers': suppliers,
+                    'quick_products': quick_products,
+                }
+                return render(request, 'core/purchase_order_form.html', context)
 
             purchase_order.total_amount = total_amount
             purchase_order.save()
 
-            if request.POST.get('draft'):
-                messages.success(request, f'Purchase order {purchase_order.po_number} saved as draft successfully!')
+            if 'draft' in request.POST:
+                messages.success(request, f'Purchase order {purchase_order.po_number} saved as draft successfully with {items_created} items!')
             else:
-                messages.success(request, f'Purchase order {purchase_order.po_number} created successfully!')
+                messages.success(request, f'Purchase order {purchase_order.po_number} created successfully with {items_created} items!')
             
             return redirect('purchase_report')
         else:
             messages.error(request, 'Please correct the errors below.')
+            print(f"DEBUG: Form errors: {form.errors}")
     else:
         form = PurchaseOrderForm()
 
@@ -1070,18 +1113,59 @@ def supplier_bills(request):
         
     bills = bills.order_by('-bill_date')
     
-    # Summary statistics
+    # Summary statistics - optimized using aggregation where possible
     total_bills = bills.count()
-    total_amount = bills.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-    total_paid = bills.aggregate(Sum('paid_amount'))['paid_amount__sum'] or 0
-    total_due = bills.aggregate(Sum('due_amount'))['due_amount__sum'] or 0
+    
+    # Use aggregation for better performance with large datasets
+    total_amount = bills.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+    total_paid = bills.aggregate(total=Sum('paid_amount'))['total'] or Decimal('0')
+    
+    # For computed properties, we need to iterate - but let's be safe
+    all_bills = list(bills)
+    
+    # Safe calculation of computed properties with error handling
+    total_returned = Decimal('0')
+    total_net_amount = Decimal('0')
+    total_effective_due = Decimal('0')
+    
+    for bill in all_bills:
+        try:
+            total_returned += getattr(bill, 'returned_amount', Decimal('0'))
+            total_net_amount += getattr(bill, 'net_amount', bill.total_amount)
+            total_effective_due += getattr(bill, 'effective_due_amount', bill.due_amount)
+        except AttributeError as e:
+            # Fallback if properties are missing
+            print(f"Warning: Missing property for bill {bill.bill_number}: {e}")
+            total_returned += Decimal('0')
+            total_net_amount += bill.total_amount
+            total_effective_due += bill.due_amount
+    
+    # Count overdue and returned bills
+    today = timezone.now().date()
+    overdue_bills_count = 0
+    returned_bills_count = 0
+    
+    for bill in all_bills:
+        try:
+            if getattr(bill, 'is_overdue', False):
+                overdue_bills_count += 1
+            if bill.status in ['returned', 'partially_returned']:
+                returned_bills_count += 1
+        except AttributeError:
+            # Skip if property is missing
+            continue
     
     # Calculate payment rate
-    payment_rate = (total_paid / total_amount * 100) if total_amount > 0 else 0
+    payment_rate = (total_paid / total_net_amount * 100) if total_net_amount > 0 else 0
     
-    # Overdue bills
-    overdue_bills = bills.filter(status='overdue')
-    overdue_amount = overdue_bills.aggregate(Sum('due_amount'))['due_amount__sum'] or 0
+    # Overdue amount
+    overdue_amount = Decimal('0')
+    for bill in all_bills:
+        try:
+            if getattr(bill, 'is_overdue', False):
+                overdue_amount += getattr(bill, 'effective_due_amount', Decimal('0'))
+        except AttributeError:
+            continue
     
     # Pagination
     paginator = Paginator(bills, 20)
@@ -1095,11 +1179,14 @@ def supplier_bills(request):
         'total_bills': total_bills,
         'total_amount': total_amount,
         'total_paid': total_paid,
-        'total_due': total_due,
+        'total_due': total_effective_due,
+        'total_returned': total_returned,
+        'total_net_amount': total_net_amount,
         'payment_rate': payment_rate,
-        'overdue_bills_count': overdue_bills.count(),
+        'overdue_bills_count': overdue_bills_count,
         'overdue_amount': overdue_amount,
-        'today': timezone.now().date(),  # Add today for due date comparisons
+        'returned_bills_count': returned_bills_count,
+        'today': today,
     }
     return render(request, 'core/supplier_bills.html', context)
 
@@ -1112,10 +1199,37 @@ def supplier_bill_detail(request, pk):
     
     payments = bill.payments.all().select_related('received_by').order_by('-payment_date')
     
+    # Use the properties from the updated model with safe access
+    total_paid = bill.paid_amount
+    
+    # Safe property access with fallbacks
+    try:
+        remaining_due = bill.effective_due_amount
+    except AttributeError:
+        remaining_due = bill.due_amount  # Fallback to database field
+        
+    try:
+        payment_percentage = bill.paid_percentage
+    except AttributeError:
+        payment_percentage = (bill.paid_amount / bill.total_amount * 100) if bill.total_amount > 0 else 0
+    
+    # Safe overdue check
+    try:
+        is_overdue = bill.is_overdue
+    except AttributeError:
+        # Fallback overdue calculation
+        today = timezone.now().date()
+        due_date = bill.due_date.date() if hasattr(bill.due_date, 'date') else bill.due_date
+        is_overdue = bill.due_amount > 0 and due_date < today
+
     context = {
         'bill': bill,
         'payments': payments,
         'today': timezone.now().date(),
+        'total_paid': total_paid,
+        'remaining_due': remaining_due,
+        'payment_percentage': payment_percentage,
+        'is_overdue': is_overdue,
     }
     return render(request, 'core/supplier_bill_detail.html', context)
 
@@ -1124,34 +1238,59 @@ def supplier_bill_detail(request, pk):
 def create_payment(request, bill_id):
     bill = get_object_or_404(SupplierBill, pk=bill_id)
     
+    # Use the can_accept_payment property from the model
+    if not bill.can_accept_payment:
+        if bill.effective_due_amount <= 0:
+            messages.warning(request, 'This bill has no due amount remaining. Payment cannot be processed.')
+        elif bill.status == 'returned':
+            messages.warning(request, 'This bill has been fully returned. Payment cannot be processed.')
+        else:
+            messages.warning(request, 'This bill cannot accept payments at this time.')
+        return redirect('supplier_bill_detail', pk=bill.id)
+    
     if request.method == 'POST':
         form = PaymentForm(request.POST, bill=bill)
         if form.is_valid():
             try:
-                payment = form.save(commit=False)
-                payment.bill = bill
-                payment.received_by = request.user
-                payment.save()
-                
-                messages.success(request, f'Payment of ৳{payment.amount} recorded successfully!')
-                return redirect('supplier_bill_detail', pk=bill.id)
-                
+                with transaction.atomic():
+                    payment = form.save(commit=False)
+                    payment.bill = bill
+                    payment.received_by = request.user
+                    
+                    # Validate payment amount against effective due amount
+                    if payment.amount > bill.effective_due_amount:
+                        form.add_error('amount', f'Payment amount cannot exceed due amount (৳{bill.effective_due_amount:.2f}).')
+                        raise ValidationError('Payment amount exceeds due amount')
+                    
+                    payment.save()
+                    
+                    # Update bill status and amounts - the save() method handles recalculation
+                    bill.refresh_from_db()
+                    bill.save()
+                    
+                    messages.success(request, f'Payment of ৳{payment.amount} recorded successfully!')
+                    return redirect('supplier_bill_detail', pk=bill.id)
+                    
             except ValidationError as e:
-                # Handle any remaining validation errors
-                for field, errors in e.error_dict.items():
-                    for error in errors:
-                        form.add_error(field, error)
+                # Handle validation errors
+                if not form.errors:
+                    for field, errors in e.error_dict.items():
+                        for error in errors:
+                            form.add_error(field, error)
             except Exception as e:
                 messages.error(request, f'Error creating payment: {str(e)}')
     else:
+        # Set initial amount to the effective due amount
+        initial_amount = bill.effective_due_amount
         form = PaymentForm(bill=bill, initial={
-            'amount': bill.due_amount,
+            'amount': initial_amount,
             'payment_date': timezone.now().date()
         })
     
     context = {
         'form': form,
         'bill': bill,
+        'max_payment_amount': bill.effective_due_amount,
     }
     return render(request, 'core/create_payment.html', context)
 
@@ -1159,47 +1298,99 @@ def create_payment(request, bill_id):
 def bill_dashboard(request):
     today = timezone.now().date()
     
-    # Key metrics
-    bills = SupplierBill.objects.all()
-    total_bills = bills.count()
-    total_amount = bills.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-    total_paid = bills.aggregate(Sum('paid_amount'))['paid_amount__sum'] or 0
-    total_due = bills.aggregate(Sum('due_amount'))['due_amount__sum'] or 0
+    # Get all bills with related data
+    bills = SupplierBill.objects.select_related('supplier', 'purchase_order')
     
-    # Overdue bills
-    overdue_bills = bills.filter(status='overdue', due_date__lt=today)
-    overdue_amount = overdue_bills.aggregate(Sum('due_amount'))['due_amount__sum'] or 0
+    # Calculate key metrics using aggregation where possible
+    total_bills = bills.count()
+    
+    # Use aggregation for database fields
+    total_amount = bills.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+    total_paid = bills.aggregate(total=Sum('paid_amount'))['total'] or Decimal('0')
+    
+    # For computed properties, iterate through bills
+    all_bills = list(bills)
+    total_returned = sum(bill.returned_amount for bill in all_bills)
+    total_net_amount = sum(bill.net_amount for bill in all_bills)
+    total_effective_due = sum(bill.effective_due_amount for bill in all_bills)
+    
+    # Use the is_overdue property from the model
+    overdue_bills = [bill for bill in all_bills if bill.is_overdue]
+    overdue_amount = sum(bill.effective_due_amount for bill in overdue_bills)
     
     # Upcoming due bills (next 7 days)
-    upcoming_due = bills.filter(
-        due_date__range=[today, today + timedelta(days=7)],
-        due_amount__gt=0
+    upcoming_due = [bill for bill in all_bills if 
+                   bill.effective_due_amount > 0 and 
+                   today <= bill.due_date.date() <= today + timedelta(days=7)]
+    
+    # Supplier-wise summary - optimized
+    supplier_summary = []
+    suppliers_with_bills = Supplier.objects.filter(
+        id__in=bills.values_list('supplier_id', flat=True).distinct()
     )
     
-    # Supplier-wise summary
-    supplier_summary = Supplier.objects.annotate(
-        total_bills=Count('supplierbill'),
-        total_amount=Sum('supplierbill__total_amount'),
-        total_due=Sum('supplierbill__due_amount')
-    ).filter(total_bills__gt=0).order_by('-total_amount')
+    for supplier in suppliers_with_bills:
+        supplier_bills = [b for b in all_bills if b.supplier_id == supplier.id]
+        if supplier_bills:
+            supplier_total_amount = sum(bill.total_amount for bill in supplier_bills)
+            supplier_paid_amount = sum(bill.paid_amount for bill in supplier_bills)
+            supplier_returned_amount = sum(bill.returned_amount for bill in supplier_bills)
+            supplier_net_amount = sum(bill.net_amount for bill in supplier_bills)
+            supplier_due_amount = sum(bill.effective_due_amount for bill in supplier_bills)
+            
+            supplier_summary.append({
+                'supplier': supplier,
+                'total_bills': len(supplier_bills),
+                'total_amount': supplier_total_amount,
+                'paid_amount': supplier_paid_amount,
+                'returned_amount': supplier_returned_amount,
+                'net_amount': supplier_net_amount,
+                'due_amount': supplier_due_amount,
+            })
+    
+    # Sort supplier summary by total amount
+    supplier_summary.sort(key=lambda x: x['total_amount'], reverse=True)
     
     # Recent bills
-    recent_bills = bills.select_related('supplier').order_by('-bill_date')[:10]
+    recent_bills = sorted(all_bills, key=lambda x: x.bill_date, reverse=True)[:10]
+    
+    # Payment performance metrics
+    payment_rate = (total_paid / total_net_amount * 100) if total_net_amount > 0 else 0
+    
+    # Return statistics
+    returned_bills_count = sum(1 for bill in all_bills if bill.status in ['returned', 'partially_returned'])
+    
+    # Status distribution using database queries for efficiency
+    status_counts = {
+        'paid': bills.filter(status='paid').count(),
+        'partial': bills.filter(status='partial').count(),
+        'pending': bills.filter(status='pending').count(),
+        'overdue': len(overdue_bills),
+        'returned': bills.filter(status='returned').count(),
+        'partially_returned': bills.filter(status='partially_returned').count(),
+    }
     
     context = {
         'total_bills': total_bills,
         'total_amount': total_amount,
         'total_paid': total_paid,
-        'total_due': total_due,
-        'overdue_bills_count': overdue_bills.count(),
+        'total_due': total_effective_due,
+        'total_returned': total_returned,
+        'total_net_amount': total_net_amount,
+        'overdue_bills_count': len(overdue_bills),
         'overdue_amount': overdue_amount,
-        'upcoming_due_count': upcoming_due.count(),
+        'upcoming_due_count': len(upcoming_due),
+        'upcoming_due_amount': sum(bill.effective_due_amount for bill in upcoming_due),
         'supplier_summary': supplier_summary,
         'recent_bills': recent_bills,
+        'payment_rate': payment_rate,
+        'returned_bills_count': returned_bills_count,
+        'status_counts': status_counts,
         'today': today,
     }
     return render(request, 'core/bill_dashboard.html', context)
 
+@login_required
 def bill_summary_api(request):
     """API endpoint for bill summary data"""
     today = timezone.now().date()
@@ -1212,18 +1403,32 @@ def bill_summary_api(request):
         {'month': "strftime('%%Y-%%m', bill_date)"}
     ).values('month').annotate(
         total_amount=Sum('total_amount'),
-        paid_amount=Sum('paid_amount')
+        paid_amount=Sum('paid_amount'),
+        bill_count=Count('id')
     ).order_by('month')
     
     # Status distribution
     status_data = SupplierBill.objects.values('status').annotate(
         count=Count('id'),
-        amount=Sum('total_amount')
+        total_amount=Sum('total_amount'),
+        paid_amount=Sum('paid_amount')
     )
+    
+    # Current stats for dashboard
+    current_stats = {
+        'total_bills': SupplierBill.objects.count(),
+        'total_amount': SupplierBill.objects.aggregate(total=Sum('total_amount'))['total'] or 0,
+        'total_paid': SupplierBill.objects.aggregate(total=Sum('paid_amount'))['total'] or 0,
+        'overdue_count': SupplierBill.objects.filter(
+            due_date__lt=today,
+            due_amount__gt=0
+        ).count(),
+    }
     
     return JsonResponse({
         'monthly_data': list(monthly_data),
         'status_data': list(status_data),
+        'current_stats': current_stats,
     })
 
 # --- User management ---

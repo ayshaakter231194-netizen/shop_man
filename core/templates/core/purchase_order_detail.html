@@ -13,6 +13,9 @@
             <a href="{% url 'purchase_report' %}" class="btn btn-sm btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> Back to Orders
             </a>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="printPurchaseOrder()">
+                <i class="fas fa-print"></i> Print PO
+            </button>
             {% if purchase_order.status == 'pending' %}
             <button type="button" class="btn btn-sm btn-success" 
                     onclick="markCompleted({{ purchase_order.id }})">
@@ -23,6 +26,73 @@
                 <i class="fas fa-times"></i> Cancel Order
             </button>
             {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Print-friendly version (hidden by default) -->
+<div id="print-section" class="d-none">
+    <div class="text-center mb-4">
+        <h2>Your Shop/Company Name</h2>
+        <p class="mb-1">Your Shop Address, City, Country</p>
+        <p>Phone: +123456789 | Email: info@yourshop.com</p>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <table class="table table-borderless">
+                <tr>
+                    <th>PO Number:</th>
+                    <td>PO-{{ purchase_order.po_number }}</td>
+                </tr>
+                <tr>
+                    <th>PO Date:</th>
+                    <td>{{ purchase_order.order_date|date:"M d, Y" }}</td>
+                </tr>
+            </table>
+        </div>
+        <div class="col-md-6">
+            <table class="table table-borderless">
+                <tr>
+                    <th>Supplier:</th>
+                    <td>{{ purchase_order.supplier.name }}</td>
+                </tr>
+                <tr>
+                    <th>Expected Date:</th>
+                    <td>{{ purchase_order.expected_date|date:"M d, Y" }}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    
+    <h4 class="mb-3">Order Items</h4>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>S/N</th>
+                <th>Product Name</th>
+                <th class="text-center">Quantity</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in purchase_order.items.all %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ item.product.name }}</td>
+                <td class="text-center">{{ item.quantity }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="mt-5 pt-5">
+        <div class="row">
+            <div class="col-md-6">
+                <p class="border-top pt-2">Authorized Signature</p>
+            </div>
+            <div class="col-md-6 text-end">
+                <p class="border-top pt-2">Supplier Signature</p>
+            </div>
         </div>
     </div>
 </div>
@@ -224,6 +294,26 @@
 <script>
 let currentOrderId = null;
 
+function printPurchaseOrder() {
+    // Get the HTML content of the print section
+    const printContent = document.getElementById('print-section').innerHTML;
+    
+    // Get the original page content
+    const originalContent = document.body.innerHTML;
+    
+    // Replace the body content with the print content
+    document.body.innerHTML = printContent;
+    
+    // Print the page
+    window.print();
+    
+    // Restore the original content
+    document.body.innerHTML = originalContent;
+    
+    // Re-initialize any necessary scripts
+    location.reload();
+}
+
 function markCompleted(orderId) {
     if (confirm('Mark this purchase order as completed? This will update stock levels and create a supplier bill.')) {
         fetch(`/purchase-order/${orderId}/complete/`, {
@@ -284,4 +374,24 @@ function confirmCancel() {
     });
 }
 </script>
+
+<style>
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #print-section, #print-section * {
+        visibility: visible;
+    }
+    #print-section {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+    .d-none {
+        display: block !important;
+    }
+}
+</style>
 {% endblock %}

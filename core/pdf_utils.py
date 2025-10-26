@@ -240,13 +240,21 @@ def create_error_pdf(error_message):
 
 def create_summary_stats_table(context):
     """Create summary statistics table"""
+    
+    # Calculate total actual paid from sales data (paid_amount - change_amount)
+    sales = context.get('sales', [])
+    total_actual_paid = sum(
+        max(0, float(sale.paid_amount or 0) - float(sale.change_amount or 0)) 
+        for sale in sales
+    )
+    
     stats_data = [
         ["Total Transactions:", f"{context.get('total_transactions', 0):,}"],
         ["Gross Sales:", format_currency(context.get('gross_sales', 0), context.get('currency_symbol', '৳'))],
         ["Returns:", format_currency(context.get('total_returns', 0), context.get('currency_symbol', '৳'))],
         ["Net Sales:", format_currency(context.get('net_sales', 0), context.get('currency_symbol', '৳'))],
         ["Total Due Amount:", format_currency(context.get('total_due_amount', 0), context.get('currency_symbol', '৳'))],
-        ["Total Paid Amount:", format_currency(context.get('total_paid_amount', 0), context.get('currency_symbol', '৳'))],
+        ["Total Paid Amount:", format_currency(total_actual_paid, context.get('currency_symbol', '৳'))],  # Use actual paid
         ["Total Items Sold:", f"{context.get('total_items_sold', 0):,}"],
         ["Items Returned:", f"{context.get('total_items_returned', 0):,}"],
         ["Net Items Sold:", f"{context.get('net_items_sold', 0):,}"],
@@ -391,7 +399,7 @@ def create_summary_table(context):
                 'tax': 0,
                 'net_sales': 0,
                 'due_amount': 0,
-                'paid_amount': 0,
+                'paid_amount': 0,  # This will now store actual paid (paid_amount - change_amount)
                 'returns': 0,
                 'sales_persons': set()
             }
@@ -401,7 +409,11 @@ def create_summary_table(context):
         sales_by_date[sale_date]['tax'] += float(sale.tax_amount or 0)
         sales_by_date[sale_date]['net_sales'] += float(sale.net_amount or 0)
         sales_by_date[sale_date]['due_amount'] += float(sale.remaining_due or 0)
-        sales_by_date[sale_date]['paid_amount'] += float(sale.paid_amount or 0)
+        
+        # CHANGE: Use actual paid amount (paid_amount - change_amount) instead of just paid_amount
+        actual_paid = float(sale.paid_amount or 0) - float(sale.change_amount or 0)
+        sales_by_date[sale_date]['paid_amount'] += max(0, actual_paid)  # Ensure not negative
+        
         sales_by_date[sale_date]['returns'] += float(sale.returned_amount or 0)
         sales_by_date[sale_date]['sales_persons'].add(safe_text(sale.sold_by.username))
     
@@ -419,7 +431,7 @@ def create_summary_table(context):
             format_currency(summary['tax'], currency_symbol),
             format_currency(summary['net_sales'], currency_symbol),
             format_currency(summary['due_amount'], currency_symbol),
-            format_currency(summary['paid_amount'], currency_symbol),
+            format_currency(summary['paid_amount'], currency_symbol),  # This now shows actual paid
             format_currency(summary['returns'], currency_symbol),
             safe_text(sales_person, 15)
         ])
@@ -431,7 +443,7 @@ def create_summary_table(context):
     total_tax = sum(item['tax'] for item in sales_by_date.values())
     total_net = sum(item['net_sales'] for item in sales_by_date.values())
     total_due = sum(item['due_amount'] for item in sales_by_date.values())
-    total_paid = sum(item['paid_amount'] for item in sales_by_date.values())
+    total_paid = sum(item['paid_amount'] for item in sales_by_date.values())  # This now shows actual total paid
     total_returns = sum(item['returns'] for item in sales_by_date.values())
     
     data.append([
@@ -441,7 +453,7 @@ def create_summary_table(context):
         format_currency(total_tax, currency_symbol),
         format_currency(total_net, currency_symbol),
         format_currency(total_due, currency_symbol),
-        format_currency(total_paid, currency_symbol),
+        format_currency(total_paid, currency_symbol),  # This now shows actual total paid
         format_currency(total_returns, currency_symbol),
         ''
     ])
@@ -506,6 +518,10 @@ def create_detailed_table(context):
         invoice_number = safe_text(sale.invoice_number[-8:], 8) if sale.invoice_number else "N/A"
         sold_by = safe_text(sale.sold_by.username, 15)
         
+        # CHANGE: Calculate actual paid amount for each sale
+        actual_paid = float(sale.paid_amount or 0) - float(sale.change_amount or 0)
+        actual_paid = max(0, actual_paid)  # Ensure not negative
+        
         data.append([
             str(sn),
             sale.sale_date.strftime("%Y-%m-%d"),
@@ -516,18 +532,23 @@ def create_detailed_table(context):
             format_currency(sale.tax_amount, currency_symbol),
             format_currency(sale.net_amount, currency_symbol),
             format_currency(sale.remaining_due, currency_symbol),
-            format_currency(sale.paid_amount, currency_symbol),
+            format_currency(actual_paid, currency_symbol),  # Use actual paid instead of paid_amount
             sold_by
         ])
         sn += 1
     
-    # Add totals row
+    # Add totals row - recalculate with actual paid amounts
     total_gross = sum(float(sale.total_amount or 0) for sale in sales)
     total_discount = sum(float(sale.discount_amount or 0) for sale in sales)
     total_tax = sum(float(sale.tax_amount or 0) for sale in sales)
     total_net = sum(float(sale.net_amount or 0) for sale in sales)
     total_due = sum(float(sale.remaining_due or 0) for sale in sales)
-    total_paid = sum(float(sale.paid_amount or 0) for sale in sales)
+    
+    # CHANGE: Calculate total actual paid (sum of all actual paid amounts)
+    total_paid = sum(
+        max(0, float(sale.paid_amount or 0) - float(sale.change_amount or 0)) 
+        for sale in sales
+    )
     
     data.append([
         '', '', '', 'TOTALS:',
@@ -536,7 +557,7 @@ def create_detailed_table(context):
         format_currency(total_tax, currency_symbol),
         format_currency(total_net, currency_symbol),
         format_currency(total_due, currency_symbol),
-        format_currency(total_paid, currency_symbol),
+        format_currency(total_paid, currency_symbol),  # This now shows actual total paid
         ''
     ])
     

@@ -17,7 +17,7 @@
 
 <!-- Summary Cards -->
 <div class="row mb-4">
-    <div class="col-xl-3 col-md-6 mb-4">
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
         <div class="card border-left-primary shadow h-100 py-2">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
@@ -35,7 +35,7 @@
         </div>
     </div>
 
-    <div class="col-xl-3 col-md-6 mb-4">
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
         <div class="card border-left-info shadow h-100 py-2">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
@@ -53,7 +53,7 @@
         </div>
     </div>
 
-    <div class="col-xl-3 col-md-6 mb-4">
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
         <div class="card border-left-success shadow h-100 py-2">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
@@ -71,7 +71,7 @@
         </div>
     </div>
 
-    <div class="col-xl-3 col-md-6 mb-4">
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
         <div class="card border-left-warning shadow h-100 py-2">
             <div class="card-body">
                 <div class="row no-gutters align-items-center">
@@ -88,39 +88,119 @@
             </div>
         </div>
     </div>
+
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card border-left-danger shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                            Returned
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">৳{{ total_returned|floatformat:2|intcomma }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-undo fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card border-left-secondary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">
+                            Payment Rate
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ payment_rate|floatformat:1 }}%</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-percentage fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="row">
-    <!-- Overdue & Upcoming Bills -->
-    <div class="col-md-6">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-exclamation-triangle"></i> Critical Bills
-                </h5>
+    <!-- Left Column -->
+    <div class="col-lg-8">
+        <!-- Critical Bills & Status Overview -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-exclamation-triangle"></i> Critical Bills
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-danger">
+                            <h6><i class="fas fa-exclamation-circle"></i> Overdue Bills</h6>
+                            <p class="mb-1"><strong>Count:</strong> {{ overdue_bills_count }}</p>
+                            <p class="mb-0"><strong>Amount:</strong> ৳{{ overdue_amount|floatformat:2|intcomma }}</p>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-clock"></i> Upcoming Due Bills (Next 7 Days)</h6>
+                            <p class="mb-1"><strong>Count:</strong> {{ upcoming_due_count }}</p>
+                            <p class="mb-0"><strong>Amount:</strong> ৳{{ upcoming_due_amount|floatformat:2|intcomma }}</p>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'supplier_bills' %}?status=overdue" class="btn btn-danger">
+                                <i class="fas fa-list"></i> View Overdue Bills
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="alert alert-danger">
-                    <h6><i class="fas fa-exclamation-circle"></i> Overdue Bills</h6>
-                    <p class="mb-1"><strong>Count:</strong> {{ overdue_bills_count }}</p>
-                    <p class="mb-0"><strong>Amount:</strong> ৳{{ overdue_amount|floatformat:2|intcomma }}</p>
-                </div>
-                
-                <div class="alert alert-warning">
-                    <h6><i class="fas fa-clock"></i> Upcoming Due Bills (Next 7 Days)</h6>
-                    <p class="mb-0"><strong>Count:</strong> {{ upcoming_due_count }}</p>
-                </div>
-                
-                <div class="d-grid gap-2">
-                    <a href="{% url 'supplier_bills' %}?status=overdue" class="btn btn-danger">
-                        <i class="fas fa-list"></i> View Overdue Bills
-                    </a>
+
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie"></i> Bill Status Overview
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group list-group-flush">
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span class="badge bg-success me-2">Paid</span>
+                                {{ status_counts.paid|default:0 }} bills
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span class="badge bg-warning me-2">Partial</span>
+                                {{ status_counts.partial|default:0 }} bills
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span class="badge bg-secondary me-2">Pending</span>
+                                {{ status_counts.pending|default:0 }} bills
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span class="badge bg-danger me-2">Overdue</span>
+                                {{ status_counts.overdue|default:0 }} bills
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span class="badge bg-info me-2">Returned</span>
+                                {{ status_counts.returned|default:0 }} bills
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span class="badge bg-secondary me-2">Partially Returned</span>
+                                {{ status_counts.partially_returned|default:0 }} bills
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Supplier Summary -->
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">
                 <h5 class="card-title mb-0">
                     <i class="fas fa-tags"></i> Supplier Summary
@@ -128,26 +208,45 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
                             <tr>
                                 <th>Supplier</th>
                                 <th class="text-end">Bills</th>
-                                <th class="text-end">Total</th>
-                                <th class="text-end">Due</th>
+                                <th class="text-end">Total Amount</th>
+                                <th class="text-end">Paid</th>
+                                <th class="text-end">Returned</th>
+                                <th class="text-end">Net Amount</th>
+                                <th class="text-end">Due Amount</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for supplier in supplier_summary %}
                             <tr>
-                                <td>{{ supplier.name }}</td>
+                                <td>{{ supplier.supplier.name }}</td>
                                 <td class="text-end">{{ supplier.total_bills }}</td>
-                                <td class="text-end">৳{{ supplier.total_amount|default:0|floatformat:2|intcomma }}</td>
-                                <td class="text-end">৳{{ supplier.total_due|default:0|floatformat:2|intcomma }}</td>
+                                <td class="text-end">৳{{ supplier.total_amount|floatformat:2|intcomma }}</td>
+                                <td class="text-end">৳{{ supplier.paid_amount|floatformat:2|intcomma }}</td>
+                                <td class="text-end">
+                                    {% if supplier.returned_amount > 0 %}
+                                    <span class="text-danger">-৳{{ supplier.returned_amount|floatformat:2|intcomma }}</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end"><strong>৳{{ supplier.net_amount|floatformat:2|intcomma }}</strong></td>
+                                <td class="text-end">
+                                    <strong class="{% if supplier.due_amount > 0 %}text-warning{% else %}text-success{% endif %}">
+                                        ৳{{ supplier.due_amount|floatformat:2|intcomma }}
+                                    </strong>
+                                </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="4" class="text-center text-muted">No supplier data available</td>
+                                <td colspan="7" class="text-center text-muted py-3">
+                                    <i class="fas fa-building fa-2x mb-2"></i>
+                                    <p>No supplier data available</p>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -157,8 +256,9 @@
         </div>
     </div>
 
-    <!-- Recent Bills -->
-    <div class="col-md-6">
+    <!-- Right Column -->
+    <div class="col-lg-4">
+        <!-- Recent Bills -->
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
@@ -169,21 +269,36 @@
                 {% if recent_bills %}
                 <div class="list-group list-group-flush">
                     {% for bill in recent_bills %}
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="mb-1">BILL-{{ bill.bill_number }}</h6>
-                            <small class="text-muted">{{ bill.supplier.name }} • {{ bill.bill_date|date:"M d, Y" }}</small>
-                        </div>
-                        <div class="text-end">
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="mb-0">BILL-{{ bill.bill_number }}</h6>
                             <span class="badge 
                                 {% if bill.status == 'paid' %}bg-success
                                 {% elif bill.status == 'partial' %}bg-warning
                                 {% elif bill.status == 'overdue' %}bg-danger
+                                {% elif bill.status == 'returned' %}bg-info
+                                {% elif bill.status == 'partially_returned' %}bg-secondary
                                 {% else %}bg-secondary{% endif %}">
                                 {{ bill.get_status_display }}
                             </span>
-                            <br>
-                            <small class="text-muted">৳{{ bill.total_amount|floatformat:2|intcomma }}</small>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">{{ bill.supplier.name }}</small>
+                            <small class="text-muted">{{ bill.bill_date|date:"M d, Y" }}</small>
+                        </div>
+                        <div class="mt-2">
+                            <div class="d-flex justify-content-between">
+                                <small>Total: ৳{{ bill.total_amount|floatformat:2|intcomma }}</small>
+                                {% if bill.returned_amount > 0 %}
+                                <small class="text-danger">Returned: -৳{{ bill.returned_amount|floatformat:2|intcomma }}</small>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <small>Paid: ৳{{ bill.paid_amount|floatformat:2|intcomma }}</small>
+                                <small class="{% if bill.effective_due_amount > 0 %}text-warning{% else %}text-success{% endif %}">
+                                    Due: ৳{{ bill.effective_due_amount|floatformat:2|intcomma }}
+                                </small>
+                            </div>
                         </div>
                     </div>
                     {% endfor %}
@@ -200,6 +315,62 @@
                         <i class="fas fa-list"></i> View All Bills
                     </a>
                 </div>
+            </div>
+        </div>
+
+        <!-- Financial Summary -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i> Financial Summary
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <small class="text-muted">Gross Amount</small>
+                    <div class="d-flex justify-content-between">
+                        <span>Total Billed:</span>
+                        <strong>৳{{ total_amount|floatformat:2|intcomma }}</strong>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <small class="text-muted">Adjustments</small>
+                    <div class="d-flex justify-content-between">
+                        <span>Returns:</span>
+                        <strong class="text-danger">-৳{{ total_returned|floatformat:2|intcomma }}</strong>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <small class="text-muted">Net Amount</small>
+                    <div class="d-flex justify-content-between">
+                        <span>Net Payable:</span>
+                        <strong>৳{{ total_net_amount|floatformat:2|intcomma }}</strong>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <small class="text-muted">Payments</small>
+                    <div class="d-flex justify-content-between">
+                        <span>Paid:</span>
+                        <strong class="text-success">৳{{ total_paid|floatformat:2|intcomma }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Remaining Due:</span>
+                        <strong class="{% if total_due > 0 %}text-warning{% else %}text-success{% endif %}">
+                            ৳{{ total_due|floatformat:2|intcomma }}
+                        </strong>
+                    </div>
+                </div>
+                
+                <div class="progress mb-3" style="height: 8px;">
+                    <div class="progress-bar bg-success" role="progressbar" 
+                         style="width: {{ payment_rate }}%" 
+                         aria-valuenow="{{ payment_rate }}" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+                <small class="text-muted">Payment Completion: {{ payment_rate|floatformat:1 }}%</small>
             </div>
         </div>
     </div>

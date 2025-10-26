@@ -221,8 +221,9 @@
                         <th>Due Date</th>
                         <th class="text-end">Total Amount</th>
                         <th class="text-end">Paid Amount</th>
-                        <th class="text-end">Due Amount</th>
                         <th class="text-end">Returned</th>
+                        <th class="text-end">Net Amount</th>
+                        <th class="text-end">Due Amount</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -251,11 +252,6 @@
                         <td class="text-end">৳{{ bill.total_amount|floatformat:2|intcomma }}</td>
                         <td class="text-end">৳{{ bill.paid_amount|floatformat:2|intcomma }}</td>
                         <td class="text-end">
-                            <strong class="{% if bill.due_amount > 0 %}text-warning{% else %}text-success{% endif %}">
-                                ৳{{ bill.due_amount|floatformat:2|intcomma }}
-                            </strong>
-                        </td>
-                        <td class="text-end">
                             {% if bill.returned_amount > 0 %}
                             <span class="text-danger">
                                 -৳{{ bill.returned_amount|floatformat:2|intcomma }}
@@ -263,6 +259,14 @@
                             {% else %}
                             <span class="text-muted">-</span>
                             {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <strong>৳{{ bill.net_amount|floatformat:2|intcomma }}</strong>
+                        </td>
+                        <td class="text-end">
+                            <strong class="{% if bill.effective_due_amount > 0 %}text-warning{% else %}text-success{% endif %}">
+                                ৳{{ bill.effective_due_amount|floatformat:2|intcomma }}
+                            </strong>
                         </td>
                         <td>
                             <span class="badge 
@@ -278,7 +282,7 @@
                             {% if bill.returned_amount > 0 %}
                             <br>
                             <small class="text-muted">
-                                Net: ৳{{ bill.net_amount|floatformat:2 }}
+                                {{ bill.returned_amount|floatformat:2 }} returned
                             </small>
                             {% endif %}
                         </td>
@@ -287,7 +291,7 @@
                                 <a href="{% url 'supplier_bill_detail' bill.id %}" class="btn btn-outline-primary" title="View Details">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                {% if bill.due_amount > 0 and bill.status != 'returned' and bill.status != 'partially_returned' %}
+                                {% if bill.effective_due_amount > 0 and bill.status != 'returned' %}
                                 <a href="{% url 'create_payment' bill.id %}" class="btn btn-outline-success" title="Add Payment">
                                     <i class="fas fa-money-bill-wave"></i>
                                 </a>
@@ -307,7 +311,6 @@
                         <th colspan="5" class="text-end">Totals:</th>
                         <th class="text-end">৳{{ total_amount|floatformat:2|intcomma }}</th>
                         <th class="text-end">৳{{ total_paid|floatformat:2|intcomma }}</th>
-                        <th class="text-end">৳{{ total_due|floatformat:2|intcomma }}</th>
                         <th class="text-end">
                             {% if total_returned > 0 %}
                             <span class="text-danger">-৳{{ total_returned|floatformat:2|intcomma }}</span>
@@ -315,6 +318,8 @@
                             <span class="text-muted">-</span>
                             {% endif %}
                         </th>
+                        <th class="text-end">৳{{ total_amount|add:total_returned|floatformat:2|intcomma }}</th>
+                        <th class="text-end">৳{{ total_due|floatformat:2|intcomma }}</th>
                         <th colspan="2"></th>
                     </tr>
                 </tfoot>
@@ -394,6 +399,14 @@
             <div class="col-md-3 mb-2">
                 <span class="badge bg-secondary me-2">Partially Returned</span>
                 <small>Partially returned</small>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12">
+                <small class="text-muted">
+                    <strong>Note:</strong> Due amount calculation considers returns. 
+                    Net Amount = Total Amount - Returned Amount
+                </small>
             </div>
         </div>
     </div>

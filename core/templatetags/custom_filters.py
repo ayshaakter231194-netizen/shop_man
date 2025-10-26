@@ -67,3 +67,4 @@ def subtract(value, arg):
 def get_item(dictionary, key):
     """Get item from dictionary by key"""
     return dictionary.get(key, '')
+

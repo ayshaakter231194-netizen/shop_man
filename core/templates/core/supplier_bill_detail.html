@@ -35,6 +35,9 @@
                                     <a href="{% url 'purchase_order_detail' bill.purchase_order.id %}">
                                         PO-{{ bill.purchase_order.po_number }}
                                     </a>
+                                    {% if bill.purchase_order.has_returns %}
+                                    <span class="badge bg-info ms-1">Has Returns</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                             <tr>
@@ -52,8 +55,11 @@
                             <tr>
                                 <th>Due Date:</th>
                                 <td>
-                                    <span class="{% if bill.status == 'overdue' %}text-danger{% elif bill.due_date < today %}text-warning{% endif %}">
+                                    <span class="{% if bill.is_overdue %}text-danger{% elif bill.due_date.date < today %}text-warning{% endif %}">
                                         {{ bill.due_date|date:"M d, Y" }}
+                                        {% if bill.is_overdue %}
+                                        <small class="badge bg-danger ms-1">Overdue</small>
+                                        {% endif %}
                                     </span>
                                 </td>
                             </tr>
@@ -64,6 +70,8 @@
                                         {% if bill.status == 'paid' %}bg-success
                                         {% elif bill.status == 'partial' %}bg-warning
                                         {% elif bill.status == 'overdue' %}bg-danger
+                                        {% elif bill.status == 'returned' %}bg-info
+                                        {% elif bill.status == 'partially_returned' %}bg-secondary
                                         {% else %}bg-secondary{% endif %}">
                                         {{ bill.get_status_display }}
                                     </span>
@@ -81,6 +89,31 @@
                     </div>
                 </div>
                 
+                <!-- Return Information -->
+                {% if bill.returned_amount > 0 %}
+                <div class="alert alert-info mt-3">
+                    <h6><i class="fas fa-undo"></i> Return Information</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Returned Amount:</strong> 
+                            <span class="text-danger">-৳{{ bill.returned_amount|floatformat:2|intcomma }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Net Amount:</strong> 
+                            <strong>৳{{ bill.net_amount|floatformat:2|intcomma }}</strong>
+                        </div>
+                    </div>
+                    {% if bill.purchase_order.returns.exists %}
+                    <div class="mt-2">
+                        <a href="{% url 'purchase_return_list' %}?purchase_order={{ bill.purchase_order.id }}" 
+                           class="btn btn-sm btn-outline-info">
+                            <i class="fas fa-list"></i> View Return Details
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
                 {% if bill.notes %}
                 <div class="row mt-3">
                     <div class="col-12">
@@ -94,8 +127,9 @@
 
         <!-- Payment History -->
         <div class="card mt-4">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">Payment History</h5>
+                <span class="badge bg-primary">Total Paid: ৳{{ total_paid|floatformat:2|intcomma }}</span>
             </div>
             <div class="card-body">
                 {% if payments %}
@@ -108,23 +142,46 @@
                                 <th>Method</th>
                                 <th>Reference</th>
                                 <th>Received By</th>
+                                <th>Notes</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for payment in payments %}
                             <tr>
                                 <td>{{ payment.payment_date|date:"M d, Y" }}</td>
-                                <td>৳{{ payment.amount|floatformat:2|intcomma }}</td>
-                                <td>{{ payment.get_payment_method_display }}</td>
+                                <td><strong>৳{{ payment.amount|floatformat:2|intcomma }}</strong></td>
+                                <td>
+                                    <span class="badge bg-secondary">
+                                        {{ payment.get_payment_method_display }}
+                                    </span>
+                                </td>
                                 <td>{{ payment.reference_number|default:"-" }}</td>
                                 <td>{{ payment.received_by.get_full_name }}</td>
+                                <td>
+                                    {% if payment.notes %}
+                                    <small class="text-muted" title="{{ payment.notes }}">
+                                        <i class="fas fa-sticky-note"></i>
+                                    </small>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th colspan="1">Total Paid:</th>
+                                <th colspan="5" class="text-success">৳{{ total_paid|floatformat:2|intcomma }}</th>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
                 {% else %}
-                <p class="text-muted text-center py-3">No payments recorded yet.</p>
+                <div class="text-center py-4">
+                    <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No payments recorded yet.</p>
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -137,31 +194,73 @@
                 <h5 class="card-title mb-0">Amount Summary</h5>
             </div>
             <div class="card-body">
-                <div class="d-flex justify-content-between mb-3">
-                    <strong>Total Amount:</strong>
-                    <span class="h5">৳{{ bill.total_amount|floatformat:2|intcomma }}</span>
+                <!-- Original Amount -->
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Total Amount:</span>
+                    <strong>৳{{ bill.total_amount|floatformat:2|intcomma }}</strong>
                 </div>
-                <div class="d-flex justify-content-between mb-3">
-                    <strong>Paid Amount:</strong>
-                    <span class="h5 text-success">৳{{ bill.paid_amount|floatformat:2|intcomma }}</span>
+                
+                <!-- Returns (if any) -->
+                {% if bill.returned_amount > 0 %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-danger">Returns:</span>
+                    <strong class="text-danger">-৳{{ bill.returned_amount|floatformat:2|intcomma }}</strong>
                 </div>
-                <div class="d-flex justify-content-between mb-3">
-                    <strong>Due Amount:</strong>
-                    <span class="h5 text-warning">৳{{ bill.due_amount|floatformat:2|intcomma }}</span>
+                
+                <!-- Net Amount -->
+                <div class="d-flex justify-content-between mb-3 border-top pt-2">
+                    <span><strong>Net Amount:</strong></span>
+                    <strong class="h5">৳{{ bill.net_amount|floatformat:2|intcomma }}</strong>
                 </div>
+                {% endif %}
+                
+                <!-- Paid Amount -->
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Paid Amount:</span>
+                    <strong class="text-success">৳{{ bill.paid_amount|floatformat:2|intcomma }}</strong>
+                </div>
+                
+                <!-- Due Amount -->
+                <div class="d-flex justify-content-between mb-3">
+                    <span><strong>Due Amount:</strong></span>
+                    <strong class="h5 {% if bill.effective_due_amount > 0 %}text-warning{% else %}text-success{% endif %}">
+                        ৳{{ bill.effective_due_amount|floatformat:2|intcomma }}
+                    </strong>
+                </div>
+                
                 <hr>
-                <div class="progress mb-3" style="height: 20px;">
-                    <div class="progress-bar bg-success" role="progressbar" 
-                         style="width: {{ bill.paid_percentage }}%">
-                        {{ bill.paid_percentage|floatformat:0 }}%
+                
+                <!-- Payment Progress -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="text-muted">Payment Progress</small>
+                        <small class="text-muted">{{ payment_percentage|floatformat:1 }}%</small>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ payment_percentage }}%"
+                             aria-valuenow="{{ payment_percentage }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            {{ payment_percentage|floatformat:0 }}%
+                        </div>
                     </div>
                 </div>
                 
-                {% if bill.due_amount > 0 %}
+                <!-- Payment Action -->
+                {% if bill.effective_due_amount > 0 and bill.status != 'returned' %}
                 <div class="d-grid">
                     <a href="{% url 'create_payment' bill.id %}" class="btn btn-success">
                         <i class="fas fa-money-bill-wave"></i> Record Payment
                     </a>
+                </div>
+                {% elif bill.status == 'returned' %}
+                <div class="alert alert-info text-center py-2">
+                    <small><i class="fas fa-info-circle"></i> This bill has been fully returned</small>
+                </div>
+                {% elif bill.effective_due_amount <= 0 %}
+                <div class="alert alert-success text-center py-2">
+                    <small><i class="fas fa-check-circle"></i> Bill fully paid</small>
                 </div>
                 {% endif %}
             </div>
@@ -174,15 +273,54 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
+                    {% if bill.purchase_order.has_returns %}
+                    <a href="{% url 'purchase_return_list' %}?purchase_order={{ bill.purchase_order.id }}" 
+                       class="btn btn-outline-info">
+                        <i class="fas fa-undo"></i> View Returns ({{ bill.purchase_order.returns.count }})
+                    </a>
+                    {% endif %}
+                    
                     <a href="#" class="btn btn-outline-primary">
                         <i class="fas fa-print"></i> Print Bill
                     </a>
-                    <a href="#" class="btn btn-outline-info">
+                    <a href="#" class="btn btn-outline-secondary">
                         <i class="fas fa-download"></i> Download PDF
                     </a>
-                    <a href="{% url 'supplier_bills' %}?supplier={{ bill.supplier.id }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-list"></i> View All Bills from {{ bill.supplier.name }}
+                    <a href="{% url 'supplier_bills' %}?supplier={{ bill.supplier.id }}" 
+                       class="btn btn-outline-dark">
+                        <i class="fas fa-list"></i> All Bills from {{ bill.supplier.name }}
                     </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Information -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Status Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>Bill Created</span>
+                        <small class="text-muted">{{ bill.created_at|date:"M d, Y" }}</small>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>Due Date</span>
+                        <small class="{% if bill.is_overdue %}text-danger{% else %}text-muted{% endif %}">
+                            {{ bill.due_date|date:"M d, Y" }}
+                        </small>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>Payments</span>
+                        <small class="text-muted">{{ payments.count }} recorded</small>
+                    </div>
+                    {% if bill.returned_amount > 0 %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>Returns</span>
+                        <small class="text-danger">-৳{{ bill.returned_amount|floatformat:2|intcomma }}</small>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
