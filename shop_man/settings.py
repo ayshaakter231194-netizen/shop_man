@@ -26,7 +26,8 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'unsafe-dev-key')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = [h for h in os.getenv('ALLOWED_HOSTS', '').split(',') if h]
+
 
 
 
